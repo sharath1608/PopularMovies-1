@@ -1,0 +1,27 @@
+<resources>
+    <string name="app_name">Popular Movies</string>
+    <string name="action_settings">Settings</string>'
+    <string name="movies_base_uri">http://api.themoviedb.org/3/discover/movie</string>
+    <string name="api_key"></string>
+    <string name="minutes">min</string>
+    <string name="no_overview">No overview available</string>
+    <string name="poster_base_path">http://image.tmdb.org/t/p</string>
+    <string name="grid_poster_size">/w185</string>
+    <string name="detail_poster_size">/w342</string>
+    <string name="title_activity_detail">Movie Details</string>
+    <string name="popularity_sort">popularity.desc</string>
+    <string name="ratings_sort">vote_average.desc</string>
+    <string name="earnings_sort">revenue.desc</string>
+    <string name="newest_sort">primary_release_date.desc</string>
+    <string name="hello_world">Hello world!</string>
+    <string name="details_base_path">http://api.themoviedb.org/3/movie/</string>
+    <string name="most_popular">Most Popular First</string>
+    <string name="highest_rated">Highest Rated First</string>
+    <string name="highest_grossing">Highest Grossing First</string>
+    <string-array name="sort_option">
+        <item>Most Popular First</item>
+        <item>Highest Rated First</item>
+        <item>Highest Grossing First</item>
+    </string-array>
+    <string name="connectionErrorString">Error receiving data from server! DO NOT PANIC!</string>
+</resources>
