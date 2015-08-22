@@ -18,6 +18,8 @@ import android.widget.ArrayAdapter;
 import android.widget.GridView;
 import android.widget.Spinner;
 import android.widget.SpinnerAdapter;
+import android.widget.Toast;
+
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -36,10 +38,13 @@ import java.util.List;
  */
 public class MainActivityFragment extends Fragment {
 
-    private static List<String> moviesImages;
-    private ArrayAdapter<String> movieGridAdapter;
+    private ArrayAdapter<GridViewObject> movieGridAdapter;
     private static List<String> movieIds;
+    private static List<GridViewObject> gridViewObjects;
     private String sortByValue;
+    private String movieKey = "movieKey";
+    private int position;
+    private GridView gridView;
 
     public MainActivityFragment() {
 
@@ -48,7 +53,9 @@ public class MainActivityFragment extends Fragment {
     @Override
     public void onStart() {
         super.onStart();
-        fetchMovies();
+
+        if(gridViewObjects.size() == 0)
+            fetchMovies();
     }
 
     @Override
@@ -56,11 +63,19 @@ public class MainActivityFragment extends Fragment {
                              Bundle savedInstanceState) {
 
         View view = inflater.inflate(R.layout.fragment_main, container, false);
-        GridView gridView = (GridView) view.findViewById(R.id.fragment_main_gridView);
-        moviesImages = new ArrayList<>();
-        movieGridAdapter = new GridViewAdapter(getActivity(),moviesImages);
+        gridView = (GridView) view.findViewById(R.id.fragment_main_gridView);
+        if(savedInstanceState != null){
+            gridViewObjects = (List<GridViewObject>)savedInstanceState.get(movieKey);
+            position = savedInstanceState.getInt("position");
+        } else{
+            gridViewObjects = new ArrayList<>();
+        }
 
+        movieGridAdapter = new GridViewAdapter(getActivity(),R.layout.grid_item_layout,gridViewObjects);
+
+        gridView.setAdapter(movieGridAdapter);
         gridView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+
             @Override
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
                 Intent detailIntent = new Intent(getActivity(), DetailActivity.class);
@@ -71,9 +86,16 @@ public class MainActivityFragment extends Fragment {
             }
         });
 
+        gridView.setSelection(position);
         setHasOptionsMenu(true);
-        gridView.setAdapter(movieGridAdapter);
         return view;
+    }
+
+    @Override
+    public void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putParcelableArrayList(movieKey, (ArrayList) gridViewObjects);
+        outState.putInt("position", gridView.getFirstVisiblePosition());
     }
 
     // Define the spinner to display the a drop-down menu to list the sort options.
@@ -81,9 +103,11 @@ public class MainActivityFragment extends Fragment {
     public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
         final String prefKey = "sortOption";
 
+        String LOG_TAG = this.getClass().getSimpleName();
         super.onCreateOptionsMenu(menu, inflater);
         getActivity().getMenuInflater().inflate(R.menu.menu_main, menu);
 
+        Log.v(LOG_TAG,"Entering onCreateOptionsMenu");
         String savedSpinnerPos = PreferenceManager.getDefaultSharedPreferences(getActivity()).getString(prefKey,"");
         Spinner sortingSpinner = (Spinner)menu.findItem(R.id.sort_spinner).getActionView();
         SpinnerAdapter spinnerAdapter = ArrayAdapter.createFromResource(getActivity().getApplication(), R.array.sort_option, android.R.layout.simple_spinner_dropdown_item);
@@ -111,7 +135,7 @@ public class MainActivityFragment extends Fragment {
                 // Using sharedPreferences to store
                 prefs = PreferenceManager.getDefaultSharedPreferences(getActivity());
                 SharedPreferences.Editor prefEditor = prefs.edit();
-                prefEditor.putString(prefKey,String.valueOf(position)).commit();
+                prefEditor.putString(prefKey, String.valueOf(position)).commit();
 
                 // fetch the list of movies with the updated sort value
                 fetchMovies();
@@ -129,10 +153,10 @@ public class MainActivityFragment extends Fragment {
         fetchMoviesTask.execute();
     }
 
-    public class FetchMoviesTask extends AsyncTask<Void, Void, List<String>> {
+    public class FetchMoviesTask extends AsyncTask<Void, Void, List<GridViewObject>> {
 
         @Override
-        protected List<String> doInBackground(Void... params) {
+        protected List<GridViewObject> doInBackground(Void... params) {
             HttpURLConnection urlConnection = null;
             BufferedReader reader = null;
             int connectionTimeout = 3000;
@@ -178,13 +202,14 @@ public class MainActivityFragment extends Fragment {
                 }
                 moviesJsonString = stringBuffer.toString();
                 try {
-                    moviesImages = getMoviesFromJson(moviesJsonString, posterSize);
+                    gridViewObjects = getMoviesFromJson(moviesJsonString, posterSize);
                 } catch (JSONException e) {
                     Log.e(LOG_TAG, "error", e);
                 }
 
             } catch (IOException e) {
                 Log.e(LOG_TAG, "Error", e);
+                Toast.makeText(getActivity(),"Error while fetching data from server!",Toast.LENGTH_SHORT).show();
                 return null;
             } finally {
                 if (urlConnection != null) {
@@ -200,10 +225,10 @@ public class MainActivityFragment extends Fragment {
                     }
                 }
             }
-            return moviesImages;
+            return gridViewObjects;
         }
 
-        private List<String> getMoviesFromJson(String moviesJsonString, String posterSize)
+        private List<GridViewObject> getMoviesFromJson(String moviesJsonString, String posterSize)
                 throws JSONException {
 
             // These are the names of the JSON objects that need to be extracted.
@@ -211,22 +236,28 @@ public class MainActivityFragment extends Fragment {
             final String RESULTS_TAG = "results";
             final String BASE_POSTER_PATH = getString(R.string.poster_base_path);
             final String IDS_TAG = "id";
+            final String TITLE_TAG = "title";
 
             JSONObject moviesJSON = new JSONObject(moviesJsonString);
-            movieIds = new ArrayList<String>();
+            movieIds = new ArrayList<>();
+            gridViewObjects = new ArrayList<>();
 
-            List<String> posterArray = new ArrayList<String>();
+            List<String> posterArray = new ArrayList<>();
             JSONArray resultsArray = moviesJSON.getJSONArray(RESULTS_TAG);
             for (int i = 0; i < resultsArray.length(); i++) {
+                GridViewObject gridViewObject = new GridViewObject();
                 JSONObject resultObject = resultsArray.getJSONObject(i);
-                posterArray.add(BASE_POSTER_PATH + posterSize + resultObject.getString(POSTER_TAG));
+                gridViewObject.setMovieUrl(BASE_POSTER_PATH + posterSize + resultObject.getString(POSTER_TAG));
+                gridViewObject.setMovieTag(resultObject.getString(TITLE_TAG));
+                gridViewObjects.add(gridViewObject);
                 movieIds.add(resultObject.getString(IDS_TAG));
             }
-            return posterArray;
+
+            return gridViewObjects;
         }
 
         @Override
-        protected void onPostExecute(List<String> result) {
+        protected void onPostExecute(List<GridViewObject> result) {
             super.onPostExecute(result);
             if (result != null) {
                 movieGridAdapter.clear();
