@@ -2,7 +2,7 @@
     <string name="app_name">Popular Movies</string>
     <string name="action_settings">Settings</string>'
     <string name="movies_base_uri">http://api.themoviedb.org/3/discover/movie</string>
-    <string name="api_key">630c07fa3fa86475de3cf0cd80027814</string>
+    <string name="api_key"></string>
     <string name="minutes">min</string>
     <string name="no_overview">No overview available</string>
     <string name="poster_base_path">http://image.tmdb.org/t/p</string>
