@@ -2,10 +2,15 @@ package app.sunshine.android.example.com.popmovies;
 
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.drawable.BitmapDrawable;
+import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.support.v4.app.Fragment;
 import android.os.Bundle;
+import android.text.method.ScrollingMovementMethod;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
@@ -14,9 +19,13 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.TextView;
+import android.widget.Toast;
+
 import com.squareup.picasso.Picasso;
+
 import org.json.JSONException;
 import org.json.JSONObject;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -171,44 +180,48 @@ public class DetailActivityFragment extends Fragment {
 
         }
         public void setFragmentViews(DetailMovieData detailMovieData){
-            int layoutWidth = 342;
-            int layoutHeight = 513;
+            final int layoutWidth = 342;
+            final int layoutHeight = 513;
             final String RATING_DEN = "/10";
+            String LOG_TAG = this.getClass().getSimpleName();
+            try {
+                TextView movieTitleView = (TextView) getActivity().findViewById(R.id.movie_title_detail);
+                TextView movieRatingView = (TextView) getActivity().findViewById(R.id.move_rating_detail);
+                TextView movieDateView = (TextView) getActivity().findViewById(R.id.movie_date_detail);
+                TextView movieDurationView = (TextView) getActivity().findViewById(R.id.movie_time_detail);
+                TextView movieDescriptionView = (TextView) getActivity().findViewById(R.id.movie_description_detail);
 
-            TextView movieTitleView = (TextView) getActivity().findViewById(R.id.movie_title_detail);
-            TextView movieRatingView = (TextView) getActivity().findViewById(R.id.move_rating_detail);
-            TextView movieDateView = (TextView) getActivity().findViewById(R.id.movie_date_detail);
-            TextView movieDurationView = (TextView) getActivity().findViewById(R.id.movie_time_detail);
-            TextView movieDescriptionView = (TextView)getActivity().findViewById(R.id.movie_description_detail);
+                ImageView imageView = (ImageView) getActivity().findViewById(R.id.movie_image_detail);
+                android.view.ViewGroup.LayoutParams layoutParams = imageView.getLayoutParams();
+                layoutParams.width = layoutWidth;
+                layoutParams.height = layoutHeight;
+                imageView.setLayoutParams(layoutParams);
 
-            ImageView imageView = (ImageView)getActivity().findViewById(R.id.movie_image_detail);
-            android.view.ViewGroup.LayoutParams layoutParams = imageView.getLayoutParams();
-            layoutParams.width = layoutWidth;
-            layoutParams.height = layoutHeight;
-            imageView.setLayoutParams(layoutParams);
+                Picasso
+                        .with(getActivity())
+                        .load(detailMovieData.getImageUrl())
+                        .fit()
+                        .into(imageView);
 
-            Picasso
-                    .with(getActivity())
-                    .load(detailMovieData.getImageUrl())
-                    .fit()
-                    .into(imageView);
+                // Some foreign movies display duration = 0 and description as "null".
+                movieRatingView.setText(detailMovieData.getRating() + RATING_DEN);
+                movieDateView.setText(detailMovieData.getYear());
 
-            // Some foreign movies display duration = 0 and description as "null".
-            movieRatingView.setText(detailMovieData.getRating() + RATING_DEN);
-            movieDateView.setText(detailMovieData.getYear());
+                if (Integer.parseInt(detailMovieData.getDuration()) == 0) {
+                    movieDurationView.setText("N/A");
+                } else {
+                    movieDurationView.setText(detailMovieData.getDuration() + getString(R.string.minutes));
+                }
 
-            if(Integer.parseInt(detailMovieData.getDuration()) == 0){
-                movieDurationView.setText("N/A");
-            }else {
-                movieDurationView.setText(detailMovieData.getDuration() + getString(R.string.minutes));
+                if (detailMovieData.getDescription().equals("null")) {
+                    movieDescriptionView.setText("No overview available");
+                } else {
+                    movieDescriptionView.setText(detailMovieData.getDescription());
+                }
+                movieTitleView.setText(detailMovieData.getTitle());
+            }catch (Exception e){
+                Log.e(LOG_TAG,"Error in displaying movie details");
             }
-
-            if(detailMovieData.getDescription().equals("null")){
-                movieDescriptionView.setText(getString(R.string.no_overview));
-            }else {
-                movieDescriptionView.setText(detailMovieData.getDescription());
-            }
-            movieTitleView.setText(detailMovieData.getTitle());
         }
     }
 }
