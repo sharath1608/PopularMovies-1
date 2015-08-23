@@ -2,15 +2,10 @@ package app.sunshine.android.example.com.popmovies;
 
 import android.content.Context;
 import android.content.Intent;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
-import android.graphics.drawable.BitmapDrawable;
-import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.support.v4.app.Fragment;
 import android.os.Bundle;
-import android.text.method.ScrollingMovementMethod;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
@@ -22,17 +17,14 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.squareup.picasso.Picasso;
-
 import org.json.JSONException;
 import org.json.JSONObject;
-
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.util.List;
 
 
 /**
@@ -41,6 +33,7 @@ import java.util.List;
 public class DetailActivityFragment extends Fragment {
 
     private String movieId;
+    private Toast noConnectToast;
 
     public static DetailActivityFragment newInstance(String id) {
         DetailActivityFragment fragment = new DetailActivityFragment();
@@ -56,9 +49,22 @@ public class DetailActivityFragment extends Fragment {
         displayMovieDetails();
     }
 
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        if(noConnectToast!=null)
+            noConnectToast.cancel();
+    }
+
     public void displayMovieDetails(){
         FetchMovieDetails fetchMovieDetails = new FetchMovieDetails();
-        fetchMovieDetails.execute(movieId);
+
+        if(NetworkUtils.isNetworkAvailable()) {
+            fetchMovieDetails.execute(movieId);
+        }else{
+            noConnectToast = Toast.makeText(getActivity(), "No connectivity! Please check your internet connection.", Toast.LENGTH_SHORT);
+            noConnectToast.show();
+        }
     }
 
     @Override

@@ -2,6 +2,8 @@ package app.sunshine.android.example.com.popmovies;
 
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.preference.PreferenceManager;
@@ -45,6 +47,7 @@ public class MainActivityFragment extends Fragment {
     private String movieKey = "movieKey";
     private int position;
     private GridView gridView;
+    private Toast noConnectToast;
 
     public MainActivityFragment() {
 
@@ -89,6 +92,13 @@ public class MainActivityFragment extends Fragment {
         gridView.setSelection(position);
         setHasOptionsMenu(true);
         return view;
+    }
+
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        if(noConnectToast!=null)
+            noConnectToast.cancel();
     }
 
     @Override
@@ -150,9 +160,13 @@ public class MainActivityFragment extends Fragment {
 
     public void fetchMovies(){
         FetchMoviesTask fetchMoviesTask = new FetchMoviesTask();
-        fetchMoviesTask.execute();
+        if(!NetworkUtils.isNetworkAvailable()) {
+            noConnectToast = Toast.makeText(getActivity(), "No connectivity! Please check your internet connection.", Toast.LENGTH_SHORT);
+            noConnectToast.show();
+        }
+        else
+            fetchMoviesTask.execute();
     }
-
     public class FetchMoviesTask extends AsyncTask<Void, Void, List<GridViewObject>> {
 
         @Override
@@ -209,7 +223,6 @@ public class MainActivityFragment extends Fragment {
 
             } catch (IOException e) {
                 Log.e(LOG_TAG, "Error", e);
-                Toast.makeText(getActivity(),"Error while fetching data from server!",Toast.LENGTH_SHORT).show();
                 return null;
             } finally {
                 if (urlConnection != null) {
