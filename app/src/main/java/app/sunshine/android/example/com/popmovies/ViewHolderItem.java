@@ -1,6 +1,5 @@
 package app.sunshine.android.example.com.popmovies;
 
-import android.media.Image;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
