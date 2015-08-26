@@ -14,6 +14,15 @@ public class GridViewObject implements Parcelable{
     private String movieUrl;
     private String movieTag;
     private String scrollPosition;
+    private String backDropURL;
+
+    public String getBackDropURL() {
+        return backDropURL;
+    }
+
+    public void setBackDropURL(String backDropURL) {
+        this.backDropURL = backDropURL;
+    }
 
     public GridViewObject() {
 

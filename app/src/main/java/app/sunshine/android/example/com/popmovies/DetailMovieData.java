@@ -12,6 +12,16 @@ public class DetailMovieData {
     private String year;
     private String duration;
 
+    public String getBackdropUrl() {
+        return backdropUrl;
+    }
+
+    public void setBackdropUrl(String backdropUrl) {
+        this.backdropUrl = backdropUrl;
+    }
+
+    private String backdropUrl;
+
     public void setTitle(String title) {
         this.title = title;
     }
