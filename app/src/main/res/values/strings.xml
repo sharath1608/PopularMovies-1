@@ -29,4 +29,5 @@
         <item>Highest Grossing First</item>
     </string-array>
     <string name="connectionErrorString">Error receiving data from server! DO NOT PANIC!</string>
+    <string name="synopsis">Synopsis</string>
 </resources>

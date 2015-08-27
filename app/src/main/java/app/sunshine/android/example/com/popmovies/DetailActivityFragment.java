@@ -187,7 +187,7 @@ public class DetailActivityFragment extends Fragment {
             JSONObject detailsJson = new JSONObject(detailsJsonString);
 
             String imageUrl = BASE_POSTER_PATH + posterSize + detailsJson.getString(POSTER_TAG);
-            String backdropUrl = BASE_POSTER_PATH + "/w500" + detailsJson.getString(BACKDROP_TAG);
+            String backdropUrl = BASE_POSTER_PATH + "/w1920" + detailsJson.getString(BACKDROP_TAG);
             String date = detailsJson.getString(RELEASE_DATE_TAG);
             String[] parsedDate = date.split("-");
 
