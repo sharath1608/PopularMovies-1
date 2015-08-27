@@ -88,6 +88,7 @@ public class MainActivityFragment extends Fragment {
                 String movieId = movieIds.get(position).toString();
                 detailIntent.putExtra(Intent.EXTRA_TEXT, movieId);
                 startActivity(detailIntent);
+
             }
         });
 
@@ -121,7 +122,7 @@ public class MainActivityFragment extends Fragment {
 
         Log.v(LOG_TAG,"Entering onCreateOptionsMenu");
         String savedSpinnerPos = PreferenceManager.getDefaultSharedPreferences(getActivity()).getString(prefKey,"");
-        Spinner sortingSpinner = (Spinner)menu.findItem(R.id.sort_spinner).getActionView();
+        final Spinner sortingSpinner = (Spinner)menu.findItem(R.id.sort_spinner).getActionView();
         SpinnerAdapter spinnerAdapter = ArrayAdapter.createFromResource(getActivity().getApplication(), R.array.sort_option, android.R.layout.simple_spinner_dropdown_item);
         sortingSpinner.setAdapter(spinnerAdapter);
         if(savedSpinnerPos!=""){
@@ -140,8 +141,12 @@ public class MainActivityFragment extends Fragment {
                     sortByValue = getString(R.string.popularity_sort);
                 } else if (itemSelected.equals(getString(R.string.highest_rated))) {
                     sortByValue = getString(R.string.ratings_sort);
+                } else if (itemSelected.equals(R.string.now_showing)) {
+                    sortByValue = getString(R.string.now_showing_sort);
                 } else if (itemSelected.equals(getString(R.string.highest_grossing))) {
                     sortByValue = getString(R.string.earnings_sort);
+                } else if(itemSelected.equals(getString(R.string.now_showing))){
+                    sortByValue = getString(R.string.now_showing_sort);
                 }
 
                 // Using sharedPreferences to store
@@ -191,12 +196,27 @@ public class MainActivityFragment extends Fragment {
             String API_REQ_STRING = "api_key";
             String SORT_BY_REQ = "sort_by";
 
-            try {
-                // URL example :  new URL("http://api.themoviedb.org/3/discover/movie?sort_by=popularity.desc&api_key=[YOUR API KEY]");
 
-                Uri builtUri = Uri.parse(MOVIES_BASE_URI).buildUpon()
-                        .appendQueryParameter(SORT_BY_REQ, sortByValue)
-                        .appendQueryParameter(API_REQ_STRING, apiKey).build();
+            try {
+
+                sortByValue = sortByValue==null?getString(R.string.now_showing_sort):sortByValue;
+
+                // URL example :  new URL("http://api.themoviedb.org/3/discover/movie?sort_by=popularity.desc&api_key=[YOUR API KEY]");
+                Uri builtUri = Uri.parse(MOVIES_BASE_URI).buildUpon().build();
+
+                if(sortByValue.equals(getString(R.string.now_showing_sort))){
+                    builtUri = builtUri.buildUpon()
+                            .appendPath(getString(R.string.movie_tag))
+                            .appendPath(getString(R.string.now_showing_sort))
+                            .build();
+                }else{
+                    builtUri = builtUri.buildUpon()
+                            .appendPath(getString(R.string.discover_tag))
+                            .appendPath(getString(R.string.movie_tag))
+                            .appendQueryParameter(SORT_BY_REQ, sortByValue).build();
+                }
+
+                builtUri = builtUri.buildUpon().appendQueryParameter(API_REQ_STRING, apiKey).build();
 
                 try {
                     URL url = new URL(builtUri.toString());
@@ -287,6 +307,7 @@ public class MainActivityFragment extends Fragment {
                 movieGridAdapter.clear();
                 movieGridAdapter.addAll(result);
             }
+
         }
 
     }

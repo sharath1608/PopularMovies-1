@@ -19,6 +19,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -46,6 +47,7 @@ public class DetailActivityFragment extends Fragment {
     private ImageView imageView;
     private TextView movieTitleView;
     private Target loadTarget;
+    private ProgressBar progressBar;
 
     public static DetailActivityFragment newInstance(String id) {
         DetailActivityFragment fragment = new DetailActivityFragment();
@@ -94,7 +96,15 @@ public class DetailActivityFragment extends Fragment {
         return view;
     }
 
+
     public class FetchMovieDetails extends AsyncTask<String,Void,DetailMovieData> {
+
+        @Override
+        protected void onPreExecute() {
+            super.onPreExecute();
+            progressBar = (ProgressBar)getActivity().findViewById(R.id.progressBar_detail);
+            progressBar.setVisibility(View.VISIBLE);
+        }
 
         @Override
         protected DetailMovieData doInBackground(String... params){
@@ -198,6 +208,7 @@ public class DetailActivityFragment extends Fragment {
             if(result!=null){
                 setFragmentViews(result);
             }
+            progressBar.setVisibility(View.GONE);
 
         }
 
@@ -250,6 +261,7 @@ public class DetailActivityFragment extends Fragment {
                             @Override
                             public void onSuccess() {
                                 loadBackgroundImage(detailMovieData.getBackdropUrl());
+                                //progressBar.setVisibility(View.GONE);
                             }
 
                             @Override

@@ -55,7 +55,6 @@ public class GridViewAdapter extends ArrayAdapter<GridViewObject>{
                 .with(mContext)
                 .load(gridViewObjects.get(position).getMovieUrl())
                 .resize(500, 750)
-                .placeholder(R.drawable.user_placeholder_image)
                 .error(R.drawable.user_placeholder_image)
                 .into(viewHolder.movieImage, new Callback() {
                     @Override
