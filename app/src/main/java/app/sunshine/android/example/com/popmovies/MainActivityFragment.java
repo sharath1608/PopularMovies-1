@@ -16,6 +16,7 @@ import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AbsListView;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.GridView;
@@ -50,6 +51,9 @@ public class MainActivityFragment extends Fragment {
     private int position;
     private GridView gridView;
     private Toast noConnectToast;
+    private static int pagenum;
+    private boolean userScrolled;
+    private boolean rogueFirstTime;
 
     public MainActivityFragment() {
 
@@ -91,8 +95,27 @@ public class MainActivityFragment extends Fragment {
 
             }
         });
-
         gridView.setSelection(position);
+
+        // Read scroll position to set page number in the request.
+        gridView.setOnScrollListener(new AbsListView.OnScrollListener() {
+            @Override
+            public void onScrollStateChanged(AbsListView view, int scrollState) {
+                if(scrollState== AbsListView.OnScrollListener.SCROLL_STATE_TOUCH_SCROLL){
+                    userScrolled = true;
+                }
+            }
+
+            @Override
+            public void onScroll(AbsListView view, int firstVisibleItem, int visibleItemCount, int totalItemCount) {
+
+                if((firstVisibleItem+visibleItemCount >=totalItemCount) && userScrolled==true) {
+                    pagenum++;
+                    fetchMovies();
+                    userScrolled = false;
+                }
+            }
+        });
         setHasOptionsMenu(true);
         return view;
     }
@@ -124,6 +147,7 @@ public class MainActivityFragment extends Fragment {
         String savedSpinnerPos = PreferenceManager.getDefaultSharedPreferences(getActivity()).getString(prefKey,"");
         final Spinner sortingSpinner = (Spinner)menu.findItem(R.id.sort_spinner).getActionView();
         SpinnerAdapter spinnerAdapter = ArrayAdapter.createFromResource(getActivity().getApplication(), R.array.sort_option, android.R.layout.simple_spinner_dropdown_item);
+        rogueFirstTime = true;
         sortingSpinner.setAdapter(spinnerAdapter);
         if(savedSpinnerPos!=""){
             sortingSpinner.setSelection(Integer.parseInt(savedSpinnerPos));
@@ -149,13 +173,22 @@ public class MainActivityFragment extends Fragment {
                     sortByValue = getString(R.string.now_showing_sort);
                 }
 
+                // Initialize pagescroll and movieIds when the sorting changes
+                pagenum = 1;
+                movieIds = new ArrayList<>();
+
                 // Using sharedPreferences to store
                 prefs = PreferenceManager.getDefaultSharedPreferences(getActivity());
                 SharedPreferences.Editor prefEditor = prefs.edit();
                 prefEditor.putString(prefKey, String.valueOf(position)).commit();
 
                 // fetch the list of movies with the updated sort value
-                fetchMovies();
+
+                if(!rogueFirstTime)
+                    fetchMovies();
+                else{
+                    rogueFirstTime = false;
+                }
             }
 
             @Override
@@ -195,6 +228,7 @@ public class MainActivityFragment extends Fragment {
             String posterSize = getString(R.string.grid_poster_size);
             String API_REQ_STRING = "api_key";
             String SORT_BY_REQ = "sort_by";
+            String PAGE_NUM = "page";
 
 
             try {
@@ -216,7 +250,8 @@ public class MainActivityFragment extends Fragment {
                             .appendQueryParameter(SORT_BY_REQ, sortByValue).build();
                 }
 
-                builtUri = builtUri.buildUpon().appendQueryParameter(API_REQ_STRING, apiKey).build();
+                pagenum = pagenum <= 1?1:pagenum;
+                builtUri = builtUri.buildUpon().appendQueryParameter(PAGE_NUM,String.valueOf(pagenum)).appendQueryParameter(API_REQ_STRING, apiKey).build();
 
                 try {
                     URL url = new URL(builtUri.toString());
@@ -282,7 +317,10 @@ public class MainActivityFragment extends Fragment {
             final String TITLE_TAG = "title";
 
             JSONObject moviesJSON = new JSONObject(moviesJsonString);
-            movieIds = new ArrayList<>();
+
+            if(movieIds==null)
+                movieIds = new ArrayList<>();
+
             gridViewObjects = new ArrayList<>();
 
             List<String> posterArray = new ArrayList<>();
@@ -304,7 +342,9 @@ public class MainActivityFragment extends Fragment {
         protected void onPostExecute(List<GridViewObject> result) {
             super.onPostExecute(result);
             if (result != null) {
-                movieGridAdapter.clear();
+                if(pagenum <=1 ) {
+                    movieGridAdapter.clear();
+                }
                 movieGridAdapter.addAll(result);
             }
 
