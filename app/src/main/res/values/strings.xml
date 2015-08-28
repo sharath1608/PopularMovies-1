@@ -25,7 +25,6 @@
     <string-array name="sort_option">
         <item>Now Showing</item>
         <item>Most Popular First</item>
-        <item>Highest Rated First</item>
         <item>Highest Grossing First</item>
     </string-array>
     <string name="connectionErrorString">Error receiving data from server! DO NOT PANIC!</string>

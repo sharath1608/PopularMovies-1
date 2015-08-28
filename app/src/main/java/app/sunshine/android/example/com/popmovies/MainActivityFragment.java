@@ -27,6 +27,7 @@ import android.widget.Toast;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
@@ -54,6 +55,7 @@ public class MainActivityFragment extends Fragment {
     private static int pagenum;
     private boolean userScrolled;
     private boolean rogueFirstTime;
+    private boolean justChangedToLand;
 
     public MainActivityFragment() {
 
@@ -63,7 +65,7 @@ public class MainActivityFragment extends Fragment {
     public void onStart() {
         super.onStart();
 
-        if(gridViewObjects.size() == 0)
+        if (gridViewObjects.size() == 0)
             fetchMovies();
     }
 
@@ -73,14 +75,15 @@ public class MainActivityFragment extends Fragment {
 
         View view = inflater.inflate(R.layout.fragment_main, container, false);
         gridView = (GridView) view.findViewById(R.id.fragment_main_gridView);
-        if(savedInstanceState != null){
-            gridViewObjects = (List<GridViewObject>)savedInstanceState.get(movieKey);
+        if (savedInstanceState != null) {
+            gridViewObjects = (List<GridViewObject>) savedInstanceState.get(movieKey);
             position = savedInstanceState.getInt("position");
-        } else{
+            justChangedToLand = true;
+        } else {
             gridViewObjects = new ArrayList<>();
         }
 
-        movieGridAdapter = new GridViewAdapter(getActivity(),R.layout.grid_item_layout,gridViewObjects);
+        movieGridAdapter = new GridViewAdapter(getActivity(), R.layout.grid_item_layout, gridViewObjects);
 
         gridView.setAdapter(movieGridAdapter);
         gridView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
@@ -101,7 +104,7 @@ public class MainActivityFragment extends Fragment {
         gridView.setOnScrollListener(new AbsListView.OnScrollListener() {
             @Override
             public void onScrollStateChanged(AbsListView view, int scrollState) {
-                if(scrollState== AbsListView.OnScrollListener.SCROLL_STATE_TOUCH_SCROLL){
+                if (scrollState == AbsListView.OnScrollListener.SCROLL_STATE_TOUCH_SCROLL) {
                     userScrolled = true;
                 }
             }
@@ -109,7 +112,7 @@ public class MainActivityFragment extends Fragment {
             @Override
             public void onScroll(AbsListView view, int firstVisibleItem, int visibleItemCount, int totalItemCount) {
 
-                if((firstVisibleItem+visibleItemCount >=totalItemCount) && userScrolled==true) {
+                if ((firstVisibleItem + visibleItemCount >= totalItemCount) && userScrolled == true) {
                     pagenum++;
                     fetchMovies();
                     userScrolled = false;
@@ -123,7 +126,7 @@ public class MainActivityFragment extends Fragment {
     @Override
     public void onDestroy() {
         super.onDestroy();
-        if(noConnectToast!=null)
+        if (noConnectToast != null)
             noConnectToast.cancel();
     }
 
@@ -143,13 +146,13 @@ public class MainActivityFragment extends Fragment {
         super.onCreateOptionsMenu(menu, inflater);
         getActivity().getMenuInflater().inflate(R.menu.menu_main, menu);
 
-        Log.v(LOG_TAG,"Entering onCreateOptionsMenu");
-        String savedSpinnerPos = PreferenceManager.getDefaultSharedPreferences(getActivity()).getString(prefKey,"");
-        final Spinner sortingSpinner = (Spinner)menu.findItem(R.id.sort_spinner).getActionView();
+        Log.v(LOG_TAG, "Entering onCreateOptionsMenu");
+        String savedSpinnerPos = PreferenceManager.getDefaultSharedPreferences(getActivity()).getString(prefKey, "");
+        final Spinner sortingSpinner = (Spinner) menu.findItem(R.id.sort_spinner).getActionView();
         SpinnerAdapter spinnerAdapter = ArrayAdapter.createFromResource(getActivity().getApplication(), R.array.sort_option, android.R.layout.simple_spinner_dropdown_item);
         rogueFirstTime = true;
         sortingSpinner.setAdapter(spinnerAdapter);
-        if(savedSpinnerPos!=""){
+        if (savedSpinnerPos != "") {
             sortingSpinner.setSelection(Integer.parseInt(savedSpinnerPos));
         }
         sortingSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
@@ -163,19 +166,14 @@ public class MainActivityFragment extends Fragment {
                 // Sorting criteria
                 if (itemSelected.equals(getString(R.string.most_popular))) {
                     sortByValue = getString(R.string.popularity_sort);
-                } else if (itemSelected.equals(getString(R.string.highest_rated))) {
-                    sortByValue = getString(R.string.ratings_sort);
                 } else if (itemSelected.equals(R.string.now_showing)) {
                     sortByValue = getString(R.string.now_showing_sort);
                 } else if (itemSelected.equals(getString(R.string.highest_grossing))) {
                     sortByValue = getString(R.string.earnings_sort);
-                } else if(itemSelected.equals(getString(R.string.now_showing))){
+                } else if (itemSelected.equals(getString(R.string.now_showing))) {
                     sortByValue = getString(R.string.now_showing_sort);
                 }
 
-                // Initialize pagescroll and movieIds when the sorting changes
-                pagenum = 1;
-                movieIds = new ArrayList<>();
 
                 // Using sharedPreferences to store
                 prefs = PreferenceManager.getDefaultSharedPreferences(getActivity());
@@ -183,10 +181,20 @@ public class MainActivityFragment extends Fragment {
                 prefEditor.putString(prefKey, String.valueOf(position)).commit();
 
                 // fetch the list of movies with the updated sort value
+                // Okay, firstly too many flags is not a thing. This *is* needed, that's what I think.
+                // onItemSelected is called when orientation is changed and when spinner is created.
+                if (!justChangedToLand) {
 
-                if(!rogueFirstTime)
-                    fetchMovies();
-                else{
+                    gridViewObjects = new ArrayList<GridViewObject>();
+                    if (!rogueFirstTime) {
+                        pagenum = 1;
+                        movieIds = new ArrayList<String>();
+                        fetchMovies();
+                    } else {
+                        rogueFirstTime = false;
+                    }
+                } else {
+                    justChangedToLand = false;
                     rogueFirstTime = false;
                 }
             }
@@ -198,14 +206,14 @@ public class MainActivityFragment extends Fragment {
         });
     }
 
-    public void fetchMovies(){
+    public void fetchMovies() {
         FetchMoviesTask fetchMoviesTask = new FetchMoviesTask();
 //        if(!NetworkUtils.isNetworkAvailable()) {
 //            noConnectToast = Toast.makeText(getActivity(), "No connectivity! Please check your internet connection.", Toast.LENGTH_SHORT);
 //            noConnectToast.show();
 //        }
 //        else
-            fetchMoviesTask.execute();
+        fetchMoviesTask.execute();
     }
 
 //    public boolean isNetworkAvailable(){
@@ -233,25 +241,25 @@ public class MainActivityFragment extends Fragment {
 
             try {
 
-                sortByValue = sortByValue==null?getString(R.string.now_showing_sort):sortByValue;
+                sortByValue = sortByValue == null ? getString(R.string.now_showing_sort) : sortByValue;
 
                 // URL example :  new URL("http://api.themoviedb.org/3/discover/movie?sort_by=popularity.desc&api_key=[YOUR API KEY]");
                 Uri builtUri = Uri.parse(MOVIES_BASE_URI).buildUpon().build();
 
-                if(sortByValue.equals(getString(R.string.now_showing_sort))){
+                if (sortByValue.equals(getString(R.string.now_showing_sort))) {
                     builtUri = builtUri.buildUpon()
                             .appendPath(getString(R.string.movie_tag))
                             .appendPath(getString(R.string.now_showing_sort))
                             .build();
-                }else{
+                } else {
                     builtUri = builtUri.buildUpon()
                             .appendPath(getString(R.string.discover_tag))
                             .appendPath(getString(R.string.movie_tag))
                             .appendQueryParameter(SORT_BY_REQ, sortByValue).build();
                 }
 
-                pagenum = pagenum <= 1?1:pagenum;
-                builtUri = builtUri.buildUpon().appendQueryParameter(PAGE_NUM,String.valueOf(pagenum)).appendQueryParameter(API_REQ_STRING, apiKey).build();
+                pagenum = pagenum <= 1 ? 1 : pagenum;
+                builtUri = builtUri.buildUpon().appendQueryParameter(PAGE_NUM, String.valueOf(pagenum)).appendQueryParameter(API_REQ_STRING, apiKey).build();
 
                 try {
                     URL url = new URL(builtUri.toString());
@@ -259,8 +267,8 @@ public class MainActivityFragment extends Fragment {
                     urlConnection.setConnectTimeout(connectionTimeout); // in milliseconds
                     urlConnection.setRequestMethod("GET");
                     urlConnection.connect();
-                }catch (ConnectException e){
-                    Log.e(LOG_TAG,"Error",e);
+                } catch (ConnectException e) {
+                    Log.e(LOG_TAG, "Error", e);
                 }
 
                 InputStream streamReader = urlConnection.getInputStream();
@@ -280,7 +288,7 @@ public class MainActivityFragment extends Fragment {
                 }
                 moviesJsonString = stringBuffer.toString();
                 try {
-                    gridViewObjects = getMoviesFromJson(moviesJsonString, posterSize);
+                    gridViewObjects.addAll(getMoviesFromJson(moviesJsonString, posterSize));
                 } catch (JSONException e) {
                     Log.e(LOG_TAG, "error", e);
                 }
@@ -315,13 +323,14 @@ public class MainActivityFragment extends Fragment {
             final String BASE_POSTER_PATH = getString(R.string.poster_base_path);
             final String IDS_TAG = "id";
             final String TITLE_TAG = "title";
-
+            List<GridViewObject> movieGridObjects;
             JSONObject moviesJSON = new JSONObject(moviesJsonString);
 
-            if(movieIds==null)
+            // This check is for scrolling multiple pages. The previous movies need to be retained when fetching the next page of movies.
+            if (movieIds == null)
                 movieIds = new ArrayList<>();
 
-            gridViewObjects = new ArrayList<>();
+            movieGridObjects = new ArrayList<>();
 
             List<String> posterArray = new ArrayList<>();
             JSONArray resultsArray = moviesJSON.getJSONArray(RESULTS_TAG);
@@ -331,24 +340,23 @@ public class MainActivityFragment extends Fragment {
                 gridViewObject.setMovieUrl(BASE_POSTER_PATH + posterSize + resultObject.getString(POSTER_TAG));
                 gridViewObject.setMovieTag(resultObject.getString(TITLE_TAG));
                 gridViewObject.setBackDropURL(resultObject.getString(BACKDROP_PATH));
-                gridViewObjects.add(gridViewObject);
+                movieGridObjects.add(gridViewObject);
                 movieIds.add(resultObject.getString(IDS_TAG));
             }
 
-            return gridViewObjects;
+            return movieGridObjects;
         }
 
+
+        //TODO: If  a new arrayList is not used to store the data from res, on movieGridAdapter.clear() wipes out res. Investigate
         @Override
-        protected void onPostExecute(List<GridViewObject> result) {
-            super.onPostExecute(result);
-            if (result != null) {
-                if(pagenum <=1 ) {
-                    movieGridAdapter.clear();
-                }
+        protected void onPostExecute(List<GridViewObject> res) {
+            if (res != null) {
+                List<GridViewObject> result = new ArrayList<>(res);
+                super.onPostExecute(res);
+                movieGridAdapter.clear();
                 movieGridAdapter.addAll(result);
             }
-
         }
-
     }
 }
