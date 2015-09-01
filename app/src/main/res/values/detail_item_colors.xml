@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="common_orange_deep">#FF5722</color>
+    <color name="common_purple_deep">#9C27B0</color>
+    <color name="common_green_deep">#43A047</color>
+    <color name="movie_title_color">#03A9F4</color>
+    <color name="review_title_color">#B2EBF2</color>
+</resources>

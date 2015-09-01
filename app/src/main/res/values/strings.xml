@@ -28,5 +28,14 @@
         <item>Highest Grossing First</item>
     </string-array>
     <string name="connectionErrorString">Error receiving data from server! DO NOT PANIC!</string>
-    <string name="synopsis">Synopsis</string>
+    <string name="synopsis">Overview</string>
+    <string name="reviews">Reviews</string>
+    <string name="dialog_close">Close</string>
+    <string name="review">Review</string>
+    <string name="no_review_text">No reviews available for this movie!</string>
+    <string name="no_trailer_text">No trailers available for this movie!</string>
+    <string name="appendAttr">trailers,credits</string>
+    <string name="youtube_base_uri">https://www.youtube.com/watch?v=</string>
+    <string name="cast_profile_baseURI">http://image.tmdb.org/t/p/w185/</string>
+    <string name="trailers">Trailers</string>
 </resources>

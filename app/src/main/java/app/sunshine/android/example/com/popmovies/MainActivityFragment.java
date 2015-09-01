@@ -20,6 +20,9 @@ import android.widget.AbsListView;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.GridView;
+import android.widget.HorizontalScrollView;
+import android.widget.LinearLayout;
+import android.widget.ListView;
 import android.widget.Spinner;
 import android.widget.SpinnerAdapter;
 import android.widget.Toast;
@@ -29,7 +32,6 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -38,6 +40,7 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
+import android.support.v7.widget.RecyclerView;
 
 /**
  * A placeholder fragment containing a simple view.
@@ -56,6 +59,7 @@ public class MainActivityFragment extends Fragment {
     private boolean userScrolled;
     private boolean rogueFirstTime;
     private boolean justChangedToLand;
+    private final String prefKey = "sortOption";
 
     public MainActivityFragment() {
 
@@ -84,7 +88,6 @@ public class MainActivityFragment extends Fragment {
         }
 
         movieGridAdapter = new GridViewAdapter(getActivity(), R.layout.grid_item_layout, gridViewObjects);
-
         gridView.setAdapter(movieGridAdapter);
         gridView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
 
@@ -99,7 +102,6 @@ public class MainActivityFragment extends Fragment {
             }
         });
         gridView.setSelection(position);
-
         // Read scroll position to set page number in the request.
         gridView.setOnScrollListener(new AbsListView.OnScrollListener() {
             @Override
@@ -140,7 +142,6 @@ public class MainActivityFragment extends Fragment {
     // Define the spinner to display the a drop-down menu to list the sort options.
     @Override
     public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
-        final String prefKey = "sortOption";
 
         String LOG_TAG = this.getClass().getSimpleName();
         super.onCreateOptionsMenu(menu, inflater);
@@ -166,7 +167,7 @@ public class MainActivityFragment extends Fragment {
                 // Sorting criteria
                 if (itemSelected.equals(getString(R.string.most_popular))) {
                     sortByValue = getString(R.string.popularity_sort);
-                } else if (itemSelected.equals(R.string.now_showing)) {
+                } else if (itemSelected.equals(getString(R.string.now_showing))) {
                     sortByValue = getString(R.string.now_showing_sort);
                 } else if (itemSelected.equals(getString(R.string.highest_grossing))) {
                     sortByValue = getString(R.string.earnings_sort);
@@ -185,10 +186,10 @@ public class MainActivityFragment extends Fragment {
                 // onItemSelected is called when orientation is changed and when spinner is created.
                 if (!justChangedToLand) {
 
-                    gridViewObjects = new ArrayList<GridViewObject>();
+                    gridViewObjects = new ArrayList<>();
                     if (!rogueFirstTime) {
                         pagenum = 1;
-                        movieIds = new ArrayList<String>();
+                        movieIds = new ArrayList<>();
                         fetchMovies();
                     } else {
                         rogueFirstTime = false;

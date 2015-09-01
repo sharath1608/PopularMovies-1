@@ -1,24 +1,33 @@
 package app.sunshine.android.example.com.popmovies;
 
+import android.content.ActivityNotFoundException;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
+import android.media.Image;
 import android.net.Uri;
 import android.support.v4.app.Fragment;
 import android.os.Bundle;
+import android.support.v7.app.AlertDialog;
+import android.support.v7.widget.LinearLayoutManager;
+import android.support.v7.widget.RecyclerView;
 import android.util.Log;
+import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ArrayAdapter;
+import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
+
 import com.android.volley.Request;
 import com.android.volley.RequestQueue;
 import com.android.volley.Response;
@@ -28,8 +37,13 @@ import com.android.volley.toolbox.Volley;
 import com.squareup.picasso.Callback;
 import com.squareup.picasso.Picasso;
 import com.squareup.picasso.Target;
+
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+
+import java.util.ArrayList;
+import java.util.List;
 
 
 /**
@@ -43,6 +57,13 @@ public class DetailActivityFragment extends Fragment {
     private TextView movieTitleView;
     private Target loadTarget;
     private ProgressBar progressBar;
+    private final String API_REQ_STRING = "api_key";
+    private final String APPEND_TO_RESPONSE = "append_to_response";
+    private List<String> fullReviewList;
+    private boolean isReviewAvailable;
+    private boolean isTrailerAvailable;
+    private CastViewAdapter castAdapter;
+    private ArrayList<CastViewObject> castViewObjects;
 
     public static DetailActivityFragment newInstance(String id) {
         DetailActivityFragment fragment = new DetailActivityFragment();
@@ -55,7 +76,12 @@ public class DetailActivityFragment extends Fragment {
     @Override
     public void onStart() {
         super.onStart();
-        requestMovieDetails();
+        progressBar = (ProgressBar) getActivity().findViewById(R.id.progressBar_detail);
+    }
+
+    @Override
+    public void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
     }
 
     @Override
@@ -65,19 +91,16 @@ public class DetailActivityFragment extends Fragment {
             noConnectToast.cancel();
     }
 
-    public void requestMovieDetails() {
+    public JsonObjectRequest getBasicInfoRequest() {
+        final String apiKey = getString(R.string.api_key);
+        final String DETAIL_BASE_URI = getString(R.string.details_base_path);
+        String appendAttr = getString(R.string.appendAttr);
+
+        Uri baseRequestUri = Uri.parse(DETAIL_BASE_URI).buildUpon().appendPath(movieId)
+                .appendQueryParameter(API_REQ_STRING, apiKey).appendQueryParameter(APPEND_TO_RESPONSE, appendAttr).build();
 
         final String LOG_TAG = getClass().getSimpleName();
-        final String API_REQ_STRING = "api_key";
-        String apiKey = getString(R.string.api_key);
-        String DETAIL_BASE_URI = getString(R.string.details_base_path);
-        progressBar = (ProgressBar)getActivity().findViewById(R.id.progressBar_detail);
-        RequestQueue mRequestQueue = Volley.newRequestQueue(getActivity());
-        Uri builtUri = Uri.parse(DETAIL_BASE_URI).buildUpon().appendPath(movieId)
-                .appendQueryParameter(API_REQ_STRING, apiKey).build();
-
-        String stringUri = builtUri.toString();
-        JsonObjectRequest primaryJsonReq = new JsonObjectRequest(Request.Method.GET, stringUri, new Response.Listener<JSONObject>() {
+        JsonObjectRequest primaryJsonReq = new JsonObjectRequest(Request.Method.GET, baseRequestUri.toString(), new Response.Listener<JSONObject>() {
 
             @Override
             public void onResponse(JSONObject response) {
@@ -88,22 +111,109 @@ public class DetailActivityFragment extends Fragment {
                     setFragmentViews(parseDetailsFromJson(response.toString(), movieData, posterSize));
                     progressBar.setVisibility(View.GONE);
                 } catch (JSONException e) {
-                    Log.e(LOG_TAG,"Error reading the response");
+                    Log.e(LOG_TAG, "Error reading the response");
+                }
+            }
+        }, new Response.ErrorListener() {
+            @Override
+            public void onErrorResponse(VolleyError error) {
+                Log.e(LOG_TAG, "Error getting response for the JSON request");
+            }
+        });
+        return primaryJsonReq;
+    }
+
+    public JsonObjectRequest getReviewInfoRequest() {
+        final String REVIEW_TAG = "reviews";
+        final String apiKey = getString(R.string.api_key);
+        final String DETAIL_BASE_URI = getString(R.string.details_base_path);
+
+
+        Uri reviewRequestUri = Uri.parse(DETAIL_BASE_URI).buildUpon().appendPath(movieId).appendPath(REVIEW_TAG)
+                .appendQueryParameter(API_REQ_STRING, apiKey).build();
+        final String LOG_TAG = getClass().getSimpleName();
+
+
+        JsonObjectRequest reviewJasonRequest = new JsonObjectRequest(Request.Method.GET, reviewRequestUri.toString(), new Response.Listener<JSONObject>() {
+
+            @Override
+            public void onResponse(JSONObject response) {
+
+                try {
+                    setReviewViews(response);
+                    progressBar.setVisibility(View.GONE);
+                } catch (JSONException e) {
+                    Log.e(LOG_TAG, "Error reading the response");
                 }
             }
 
         }, new Response.ErrorListener() {
             @Override
             public void onErrorResponse(VolleyError error) {
-                Log.e(LOG_TAG,"Error getting response for the JSON request");
+                Log.e(LOG_TAG, "Error getting response for the JSON request");
             }
         });
 
-        mRequestQueue.add(primaryJsonReq);
+        return reviewJasonRequest;
+    }
+
+    public void setReviewViews(JSONObject JsonResp) throws JSONException {
+        final String RESULT_TAG = "results";
+        final String CONTENT_TAG = "content";
+        final String AUTHOR_TAG = "author";
+        int reviewStart = 0;
+        int reviewEnd = 150;
+
+
+        List<String> reviewList = new ArrayList<>();
+        fullReviewList = new ArrayList<String>();
+        JSONArray resultsArray = JsonResp.getJSONArray(RESULT_TAG);
+
+        // Parse review content and add to reviewList to be displayed on the detail screen and fullReviewList which will be displayed in a dialog.
+        for (int i = 0; i < resultsArray.length(); i++) {
+            JSONObject result = resultsArray.getJSONObject(i);
+            String reviewString = result.getString(CONTENT_TAG);
+            String author = result.getString(AUTHOR_TAG);
+            reviewEnd = reviewEnd > reviewString.length() ? reviewString.length() : reviewEnd;
+            fullReviewList.add("\"" + reviewString + "\"" + " -" + author);
+            reviewList.add("\"" + reviewString.substring(reviewStart, reviewEnd) + "..." + "\"" + " -" + result.getString(AUTHOR_TAG));
+            isReviewAvailable = true;
+        }
+
+        if (resultsArray.length() == 0) {
+            reviewList.add(getString(R.string.no_review_text));
+            isReviewAvailable = false;
+        }
+
+        LinearLayout layout = (LinearLayout) getActivity().findViewById(R.id.review_layout);
+        for (int pos = 0; pos < reviewList.size(); pos++) {
+            final int finalPos = pos;
+            LayoutInflater inflater = (LayoutInflater) getActivity().getSystemService(Context.LAYOUT_INFLATER_SERVICE);
+            View v = inflater.inflate(R.layout.review_item_layout, null);
+            TextView reviewText = (TextView) v.findViewById(R.id.movie_review_text);
+
+            if (isReviewAvailable) {
+                reviewText.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        reviewInformationPopUp(finalPos);
+                    }
+                });
+            }
+            reviewText.setText(reviewList.get(pos));
+            layout.addView(v);
+        }
 
     }
 
+    public void requestMovieDetails() {
+        RequestQueue mRequestQueue = Volley.newRequestQueue(getActivity());
+        mRequestQueue.add(getBasicInfoRequest());
+        mRequestQueue.add(getReviewInfoRequest());
+    }
+
     @Override
+
     public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
         super.onCreateOptionsMenu(menu, inflater);
     }
@@ -115,7 +225,40 @@ public class DetailActivityFragment extends Fragment {
         inflater = (LayoutInflater) getActivity().getSystemService(Context.LAYOUT_INFLATER_SERVICE);
         View view = inflater.inflate(R.layout.fragment_detail, container, false);
         movieId = getArguments().getString(Intent.EXTRA_TEXT);
+        RecyclerView recyclerView = (RecyclerView)view.findViewById(R.id.cast_list_view);
+        castAdapter = new CastViewAdapter(new ArrayList<CastViewObject>());
+        LinearLayoutManager linearLayoutManager = new LinearLayoutManager(getActivity());
+        linearLayoutManager.setOrientation(LinearLayoutManager.HORIZONTAL);
+        recyclerView.setLayoutManager(linearLayoutManager);
+        recyclerView.setAdapter(castAdapter);
+        requestMovieDetails();
         return view;
+    }
+
+    public void reviewInformationPopUp(int position) {
+        final AlertDialog builder = new AlertDialog.Builder(getActivity()).create();
+        LayoutInflater layoutInflater = (LayoutInflater) getActivity().getSystemService(Context.LAYOUT_INFLATER_SERVICE);
+        View view = layoutInflater.inflate(R.layout.review_dialog_layout, null);
+        builder.setView(view);
+        TextView textView = (TextView) view.findViewById(R.id.review_dialog_text);
+        textView.setText(fullReviewList.get(position));
+        TextView title = new TextView(getActivity());
+        title.setText(getString(R.string.review));
+        title.setPadding(10, 25, 10, 20);
+        title.setTextSize(21);
+        title.setBackgroundColor(getResources().getColor(R.color.movie_title_color));
+        title.setGravity(Gravity.CENTER);
+        builder.setCustomTitle(title);
+
+        Button dismissButton = (Button) view.findViewById(R.id.dialog_dismiss_button);
+        dismissButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                builder.dismiss();
+            }
+        });
+
+        builder.show();
     }
 
     public DetailMovieData parseDetailsFromJson(String detailsJsonString, DetailMovieData detailMovieData, String posterSize) throws JSONException {
@@ -129,6 +272,15 @@ public class DetailActivityFragment extends Fragment {
         final String VOTE_AVERAGE_TAG = "vote_average";
         final String RELEASE_DATE_TAG = "release_date";
         final String BACKDROP_TAG = "backdrop_path";
+        final String TRAILERS_TAG = "trailers";
+        final String YOUTUBE_TAG = "youtube";
+        final String TRAILER_NAME_TAG = "name";
+        final String TRAILER_SOURCE_TAG = "source";
+        final String CREDITS_TAG = "credits";
+        final String CAST_TAG = "cast";
+        final String CAST_NAME_TAG = "name";
+        final String CAST_CHARACTER_TAG = "character";
+        final String CAST_PROFILE_TAG = "profile_path";
 
         JSONObject detailsJson = new JSONObject(detailsJsonString);
 
@@ -145,6 +297,30 @@ public class DetailActivityFragment extends Fragment {
         detailMovieData.setYear(parsedDate[0]);
         detailMovieData.setTitle(detailsJson.getString(TITLE_TAG));
         detailMovieData.setBackdropUrl(backdropUrl);
+
+        JSONObject trailerObject = detailsJson.getJSONObject(TRAILERS_TAG);
+        JSONArray YtTrailerArray = trailerObject.getJSONArray(YOUTUBE_TAG);
+
+        Trailer[] trailers = new Trailer[YtTrailerArray.length()];
+        for (int i = 0; i < YtTrailerArray.length(); i++) {
+            String trailerName = YtTrailerArray.getJSONObject(i).getString(TRAILER_NAME_TAG);
+            String trailerId = YtTrailerArray.getJSONObject(i).getString(TRAILER_SOURCE_TAG);
+            String trailerUrl = getString(R.string.youtube_base_uri) + trailerId;
+            trailers[i] = new Trailer(trailerName, trailerUrl,trailerId);
+        }
+
+        JSONObject creditsObject = detailsJson.getJSONObject(CREDITS_TAG);
+        JSONArray castsJsonArray = creditsObject.getJSONArray(CAST_TAG);
+        ArrayList<CastViewObject> castObjectArray= new ArrayList<CastViewObject>();
+        for(int i=0;i<castsJsonArray.length();i++){
+            String castName = castsJsonArray.getJSONObject(i).getString(CAST_NAME_TAG);
+            String castChar = castsJsonArray.getJSONObject(i).getString(CAST_CHARACTER_TAG);
+            String castProfile = castsJsonArray.getJSONObject(i).getString(CAST_PROFILE_TAG);
+            String castImageUrl = getString(R.string.cast_profile_baseURI)+castProfile;
+            castObjectArray.add(new CastViewObject(castName,castChar,castImageUrl));
+        }
+        detailMovieData.setTrailers(trailers);
+        detailMovieData.setCasts(castObjectArray);
         return detailMovieData;
     }
 
@@ -197,7 +373,7 @@ public class DetailActivityFragment extends Fragment {
                         @Override
                         public void onSuccess() {
                             loadBackgroundImage(detailMovieData.getBackdropUrl());
-                            //progressBar.setVisibility(View.GONE);
+                            progressBar.setVisibility(View.GONE);
                         }
 
                         @Override
@@ -221,9 +397,51 @@ public class DetailActivityFragment extends Fragment {
             } else {
                 movieDescriptionView.setText(detailMovieData.getDescription());
             }
+
+            setCastView(detailMovieData.getCasts());
             movieTitleView.setText(detailMovieData.getTitle());
+            setTrailerViews(detailMovieData.getTrailers());
+
         } catch (Exception e) {
             Log.e(LOG_TAG, "Error in displaying movie details");
         }
     }
+
+    public void setCastView(List<CastViewObject> castViewList){
+        castAdapter.setCastViewList(castViewList);
+        castAdapter.notifyDataSetChanged();
+    }
+
+    public void setTrailerViews(Trailer[] trailerData) {
+        LayoutInflater inflater = (LayoutInflater) getActivity().getSystemService(Context.LAYOUT_INFLATER_SERVICE);
+        LinearLayout layout = (LinearLayout) getActivity().findViewById(R.id.trailer_layout);
+        for (int pos = 0; pos<trailerData.length; pos++) {
+            View v = inflater.inflate(R.layout.trailer_item_layout, null);
+            TextView trailerText = (TextView) v.findViewById(R.id.trailer_name);
+            ImageView playImage = (ImageView)v.findViewById(R.id.video_play_image);
+            if(trailerData.length == 0){
+                trailerText.setText(getString(R.string.no_trailer_text));
+                playImage.setVisibility(View.INVISIBLE);
+            } else {
+                final Trailer currentTrailer = trailerData[pos];
+                trailerText.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        try {
+                            Intent ytIntent = new Intent(Intent.ACTION_VIEW, Uri.parse("vnd:youtube:" + currentTrailer.getTrailerId()));
+                            startActivity(ytIntent);
+                        } catch (ActivityNotFoundException e) {
+                            Intent uriIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(currentTrailer.getSource()));
+                            startActivity(uriIntent);
+                        }
+                    }
+                });
+
+                trailerText.setText(trailerData[pos].getTrailerName());
+                playImage.setVisibility(View.VISIBLE);
+            }
+            layout.addView(v);
+        }
+    }
+
 }
