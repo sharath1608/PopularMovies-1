@@ -6,12 +6,11 @@ import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
-import android.media.Image;
 import android.net.Uri;
 import android.support.v4.app.Fragment;
 import android.os.Bundle;
+import android.support.v4.view.MenuItemCompat;
 import android.support.v7.app.AlertDialog;
-import android.support.v7.widget.DefaultItemAnimator;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.util.Log;
@@ -19,16 +18,16 @@ import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
+import android.support.v7.widget.ShareActionProvider;
 import android.widget.TextView;
 import android.widget.Toast;
-
 import com.android.volley.Request;
 import com.android.volley.RequestQueue;
 import com.android.volley.Response;
@@ -38,11 +37,9 @@ import com.android.volley.toolbox.Volley;
 import com.squareup.picasso.Callback;
 import com.squareup.picasso.Picasso;
 import com.squareup.picasso.Target;
-
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
-
 import java.util.ArrayList;
 import java.util.List;
 
@@ -67,6 +64,8 @@ public class DetailActivityFragment extends Fragment {
     private CastViewAdapter castAdapter;
     private ArrayList<CastViewObject> castObjectArray;
     private RequestQueue mRequestQueue;
+    private ShareActionProvider mShareActionProvider;
+    private DetailMovieData thisMovieData;
 
     public static DetailActivityFragment newInstance(String id) {
         DetailActivityFragment fragment = new DetailActivityFragment();
@@ -89,6 +88,7 @@ public class DetailActivityFragment extends Fragment {
         linearLayoutManager.requestSimpleAnimationsInNextLayout();
         recyclerView.setLayoutManager(linearLayoutManager);
         requestMovieDetails();
+        setHasOptionsMenu(true);
         castAdapter.setOnItemClickListener(new CastViewAdapter.OnItemClickListener() {
 
             @Override
@@ -98,6 +98,7 @@ public class DetailActivityFragment extends Fragment {
             }
         });
         recyclerView.setAdapter(castAdapter);
+
         return view;
     }
 
@@ -135,8 +136,9 @@ public class DetailActivityFragment extends Fragment {
 
                 try {
                     String posterSize = getString(R.string.detail_poster_size);
-                    DetailMovieData movieData = new DetailMovieData();
-                    setFragmentViews(parseDetailsFromJson(response.toString(), movieData, posterSize));
+                    thisMovieData = parseDetailsFromJson(response.toString(), new DetailMovieData(), posterSize);
+                    setFragmentViews(thisMovieData);
+                    setShareProvider();
                     progressBar.setVisibility(View.GONE);
                 } catch (JSONException e) {
                     Log.e(LOG_TAG, "Error reading the response");
@@ -287,11 +289,11 @@ public class DetailActivityFragment extends Fragment {
     }
 
     @Override
-
     public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
         super.onCreateOptionsMenu(menu, inflater);
+        MenuItem shareMenuItem = menu.findItem(R.id.menu_movie_share);
+        mShareActionProvider = (ShareActionProvider)MenuItemCompat.getActionProvider(shareMenuItem);
     }
-
 
     public void reviewInformationPopUp(int position) {
         final AlertDialog builder = new AlertDialog.Builder(getActivity()).create();
@@ -383,6 +385,28 @@ public class DetailActivityFragment extends Fragment {
         detailMovieData.setTrailers(trailers);
         detailMovieData.setCasts(castObjectArray);
         return detailMovieData;
+    }
+
+    public void setShareProvider(){
+        if(mShareActionProvider!=null){
+            mShareActionProvider.setShareIntent(createShareIntent());
+        }
+    }
+
+    public Intent createShareIntent(){
+        Intent shareIntent = new Intent(Intent.ACTION_SEND);
+        String shareString = getString(R.string.share_base_string_1)
+                +": "
+                +thisMovieData.getTrailers()[0].getSource()
+                + " "
+                +getString(R.string.share_base_string_2)
+                +" '"
+                +thisMovieData.getTitle()
+                +"' "
+                +getString(R.string.share_base_string3);
+        shareIntent.setType("text/plain");
+        shareIntent.putExtra(Intent.EXTRA_TEXT,shareString);
+        return shareIntent;
     }
 
     public void loadBackgroundImage(String backdropUrl) {
@@ -485,7 +509,7 @@ public class DetailActivityFragment extends Fragment {
                 playImage.setVisibility(View.INVISIBLE);
             } else {
                 final Trailer currentTrailer = trailerData[pos];
-                trailerText.setOnClickListener(new View.OnClickListener() {
+                v.setOnClickListener(new View.OnClickListener() {
                     @Override
                     public void onClick(View v) {
                         try {
