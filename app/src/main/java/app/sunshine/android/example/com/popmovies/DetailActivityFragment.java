@@ -11,6 +11,7 @@ import android.net.Uri;
 import android.support.v4.app.Fragment;
 import android.os.Bundle;
 import android.support.v7.app.AlertDialog;
+import android.support.v7.widget.DefaultItemAnimator;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.util.Log;
@@ -46,6 +47,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 
+
 /**
  * A placeholder fragment containing a simple view.
  */
@@ -63,7 +65,8 @@ public class DetailActivityFragment extends Fragment {
     private boolean isReviewAvailable;
     private boolean isTrailerAvailable;
     private CastViewAdapter castAdapter;
-    private ArrayList<CastViewObject> castViewObjects;
+    private ArrayList<CastViewObject> castObjectArray;
+    private RequestQueue mRequestQueue;
 
     public static DetailActivityFragment newInstance(String id) {
         DetailActivityFragment fragment = new DetailActivityFragment();
@@ -71,6 +74,31 @@ public class DetailActivityFragment extends Fragment {
         args.putString(Intent.EXTRA_TEXT, id);
         fragment.setArguments(args);
         return fragment;
+    }
+
+    @Override
+    public View onCreateView(LayoutInflater inflater, ViewGroup container,
+                             Bundle savedInstanceState) {
+        inflater = (LayoutInflater) getActivity().getSystemService(Context.LAYOUT_INFLATER_SERVICE);
+        View view = inflater.inflate(R.layout.fragment_detail, container, false);
+        movieId = getArguments().getString(Intent.EXTRA_TEXT);
+        RecyclerView recyclerView = (RecyclerView)view.findViewById(R.id.cast_list_view);
+        castAdapter = new CastViewAdapter(new ArrayList<CastViewObject>());
+        LinearLayoutManager linearLayoutManager = new LinearLayoutManager(getActivity());
+        linearLayoutManager.setOrientation(LinearLayoutManager.HORIZONTAL);
+        linearLayoutManager.requestSimpleAnimationsInNextLayout();
+        recyclerView.setLayoutManager(linearLayoutManager);
+        requestMovieDetails();
+        castAdapter.setOnItemClickListener(new CastViewAdapter.OnItemClickListener() {
+
+            @Override
+            public void onItemClick(View v, int position) {
+                CastViewObject chosenCast = castObjectArray.get(position);
+                mRequestQueue.add(getPersonRequest(chosenCast.getCastId()));
+            }
+        });
+        recyclerView.setAdapter(castAdapter);
+        return view;
     }
 
     @Override
@@ -206,8 +234,54 @@ public class DetailActivityFragment extends Fragment {
 
     }
 
+    // Launch another volley request to fetch cast Id in order to get imdb ID subsequently.
+    public JsonObjectRequest getPersonRequest(String personId) {
+        final String PERSON_TAG = "person";
+        final String apiKey = getString(R.string.api_key);
+        final String BASE_URI = getString(R.string.tmdb_base_uri);
+
+
+        Uri reviewRequestUri = Uri.parse(BASE_URI).buildUpon().appendPath(PERSON_TAG).appendPath(personId)
+                .appendQueryParameter(API_REQ_STRING, apiKey).build();
+        final String LOG_TAG = getClass().getSimpleName();
+
+        final JsonObjectRequest personJsonRequest = new JsonObjectRequest(Request.Method.GET, reviewRequestUri.toString(), new Response.Listener<JSONObject>() {
+
+            @Override
+            public void onResponse(JSONObject response) {
+                try {
+                    String imdbId = fetchImdbId(response.toString());
+                    if(!imdbId.equals("")) {
+                        Uri imdbPage = Uri.parse(getString(R.string.imdb_base_uri) + imdbId);
+                        Intent mIntent = new Intent(Intent.ACTION_VIEW, imdbPage);
+                        if (mIntent.resolveActivity(getActivity().getPackageManager()) != null) {
+                            startActivity(mIntent);
+                        }
+                    }else{
+                        Toast.makeText(getActivity(),"No details available for this cast member!",Toast.LENGTH_SHORT).show();
+                    }
+                } catch (JSONException e) {
+                    Log.e(LOG_TAG, "Error reading the response");
+                }
+            }
+
+        }, new Response.ErrorListener() {
+            @Override
+            public void onErrorResponse(VolleyError error) {
+                Log.e(LOG_TAG, "Error getting response for the JSON request");
+            }
+        });
+        return personJsonRequest;
+    }
+
+    public String fetchImdbId(String JsonRespString) throws JSONException{
+        JSONObject jsonObject = new JSONObject(JsonRespString);
+        String imdbId = jsonObject.getString(getString(R.string.imdbId));
+        return imdbId;
+    }
+
     public void requestMovieDetails() {
-        RequestQueue mRequestQueue = Volley.newRequestQueue(getActivity());
+        mRequestQueue = Volley.newRequestQueue(getActivity());
         mRequestQueue.add(getBasicInfoRequest());
         mRequestQueue.add(getReviewInfoRequest());
     }
@@ -218,22 +292,6 @@ public class DetailActivityFragment extends Fragment {
         super.onCreateOptionsMenu(menu, inflater);
     }
 
-    @Override
-    public View onCreateView(LayoutInflater inflater, ViewGroup container,
-                             Bundle savedInstanceState) {
-
-        inflater = (LayoutInflater) getActivity().getSystemService(Context.LAYOUT_INFLATER_SERVICE);
-        View view = inflater.inflate(R.layout.fragment_detail, container, false);
-        movieId = getArguments().getString(Intent.EXTRA_TEXT);
-        RecyclerView recyclerView = (RecyclerView)view.findViewById(R.id.cast_list_view);
-        castAdapter = new CastViewAdapter(new ArrayList<CastViewObject>());
-        LinearLayoutManager linearLayoutManager = new LinearLayoutManager(getActivity());
-        linearLayoutManager.setOrientation(LinearLayoutManager.HORIZONTAL);
-        recyclerView.setLayoutManager(linearLayoutManager);
-        recyclerView.setAdapter(castAdapter);
-        requestMovieDetails();
-        return view;
-    }
 
     public void reviewInformationPopUp(int position) {
         final AlertDialog builder = new AlertDialog.Builder(getActivity()).create();
@@ -281,6 +339,8 @@ public class DetailActivityFragment extends Fragment {
         final String CAST_NAME_TAG = "name";
         final String CAST_CHARACTER_TAG = "character";
         final String CAST_PROFILE_TAG = "profile_path";
+        final String CAST_ID = "id";
+
 
         JSONObject detailsJson = new JSONObject(detailsJsonString);
 
@@ -311,13 +371,14 @@ public class DetailActivityFragment extends Fragment {
 
         JSONObject creditsObject = detailsJson.getJSONObject(CREDITS_TAG);
         JSONArray castsJsonArray = creditsObject.getJSONArray(CAST_TAG);
-        ArrayList<CastViewObject> castObjectArray= new ArrayList<CastViewObject>();
+        castObjectArray= new ArrayList<CastViewObject>();
         for(int i=0;i<castsJsonArray.length();i++){
             String castName = castsJsonArray.getJSONObject(i).getString(CAST_NAME_TAG);
             String castChar = castsJsonArray.getJSONObject(i).getString(CAST_CHARACTER_TAG);
             String castProfile = castsJsonArray.getJSONObject(i).getString(CAST_PROFILE_TAG);
             String castImageUrl = getString(R.string.cast_profile_baseURI)+castProfile;
-            castObjectArray.add(new CastViewObject(castName,castChar,castImageUrl));
+            String castID = castsJsonArray.getJSONObject(i).getString(CAST_ID);
+            castObjectArray.add(new CastViewObject(castName,castChar,castImageUrl,castID));
         }
         detailMovieData.setTrailers(trailers);
         detailMovieData.setCasts(castObjectArray);

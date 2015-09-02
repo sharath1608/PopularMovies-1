@@ -1,7 +1,7 @@
 <resources>
     <string name="app_name">Popular Movies</string>
     <string name="action_settings">Settings</string>'
-    <string name="movies_base_uri">http://api.themoviedb.org/3</string>
+    <string name="tmdb_base_uri">http://api.themoviedb.org/3</string>
     <string name="discover_tag">discover</string>
     <string name="movie_tag">movie</string>
     <string name="api_key">630c07fa3fa86475de3cf0cd80027814</string>
@@ -38,4 +38,7 @@
     <string name="youtube_base_uri">https://www.youtube.com/watch?v=</string>
     <string name="cast_profile_baseURI">http://image.tmdb.org/t/p/w185/</string>
     <string name="trailers">Trailers</string>
+    <string name="cast">Cast</string>
+    <string name="imdbId">imdb_id</string>
+    <string name="imdb_base_uri">http://imdb.com/name/</string>
 </resources>

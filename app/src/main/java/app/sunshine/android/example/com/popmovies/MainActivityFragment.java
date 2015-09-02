@@ -233,7 +233,7 @@ public class MainActivityFragment extends Fragment {
             String apiKey = getString(R.string.api_key);
             String moviesJsonString = null;
             String LOG_TAG = FetchMoviesTask.class.getSimpleName();
-            String MOVIES_BASE_URI = getString(R.string.movies_base_uri);
+            String MOVIES_BASE_URI = getString(R.string.tmdb_base_uri);
             String posterSize = getString(R.string.grid_poster_size);
             String API_REQ_STRING = "api_key";
             String SORT_BY_REQ = "sort_by";

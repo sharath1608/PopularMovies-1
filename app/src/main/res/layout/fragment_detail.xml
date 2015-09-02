@@ -191,7 +191,41 @@
             android:layout_below="@id/review_title_text"
             android:layout_marginBottom="20dp"
             android:layout_marginTop="15dp"
-            android:orientation="vertical"></LinearLayout>
+            android:orientation="vertical"/>
+
+
+        <View
+            android:id="@+id/cast_divider"
+            style="?android:listDivider"
+            android:layout_width="fill_parent"
+            android:layout_height="1dp"
+            android:layout_alignParentStart="true"
+            android:layout_below="@+id/review_layout"
+            android:layout_marginBottom="10dp"
+            android:layout_marginEnd="25dp"
+            android:layout_marginStart="25dp"
+            android:layout_marginTop="3dp"
+            android:background="@android:color/darker_gray" />
+
+        <TextView
+            android:id="@+id/cast_title_text"
+            style="@android:style/TextAppearance.Material.Medium"
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:layout_below="@id/cast_divider"
+            android:layout_marginBottom="5dp"
+            android:layout_marginTop="2dp"
+            android:gravity="center"
+            android:text="@string/cast"
+            android:textStyle="bold" />
+
+
+        <android.support.v7.widget.RecyclerView
+            android:id="@+id/cast_list_view"
+            android:layout_width="match_parent"
+            android:layout_height="200dp"
+            android:layout_below="@+id/cast_title_text"
+            android:layout_marginTop="10dp"/>
 
         <View
             android:id="@+id/trailer_divider"
@@ -199,7 +233,7 @@
             android:layout_width="fill_parent"
             android:layout_height="1dp"
             android:layout_alignParentStart="true"
-            android:layout_below="@+id/review_layout"
+            android:layout_below="@+id/cast_list_view"
             android:layout_marginBottom="10dp"
             android:layout_marginEnd="25dp"
             android:layout_marginStart="25dp"
@@ -227,43 +261,7 @@
             android:layout_below="@id/trailer_title_text"
             android:layout_marginBottom="20dp"
             android:layout_marginTop="15dp"
-            android:orientation="vertical"></LinearLayout>
+            android:orientation="vertical"/>
 
-        <View
-            android:id="@+id/cast_divider"
-            style="?android:listDivider"
-            android:layout_width="fill_parent"
-            android:layout_height="1dp"
-            android:layout_alignParentStart="true"
-            android:layout_below="@+id/trailer_layout"
-            android:layout_marginBottom="10dp"
-            android:layout_marginEnd="25dp"
-            android:layout_marginStart="25dp"
-            android:layout_marginTop="3dp"
-            android:background="@android:color/darker_gray" />
-
-
-        <android.support.v7.widget.RecyclerView
-            android:id="@+id/cast_list_view"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:layout_alignLeft="@+id/movie_image_detail"
-            android:layout_alignStart="@+id/movie_image_detail"
-            android:layout_below="@+id/cast_divider"
-            android:layout_marginTop="10dp"
-            android:clickable="false" />
-
-        <View
-            android:id="@+id/last_divider"
-            style="?android:listDivider"
-            android:layout_width="fill_parent"
-            android:layout_height="1dp"
-            android:layout_alignParentStart="true"
-            android:layout_below="@+id/cast_list_view"
-            android:layout_marginBottom="10dp"
-            android:layout_marginEnd="25dp"
-            android:layout_marginStart="25dp"
-            android:layout_marginTop="3dp"
-            android:background="@android:color/darker_gray" />
     </RelativeLayout>
 </com.nirhart.parallaxscroll.views.ParallaxScrollView>
