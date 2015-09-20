@@ -45,4 +45,6 @@
     <string name="share_base_string_1">Hey there! Check out this awesome trailer </string>
     <string name="share_base_string_2"> from the movie </string>
     <string name="share_base_string3">#Flixology</string>
+    <string name="no_share_text">No trailers available to share.</string>
+    <string name="no_detals_text">No details available for this cast member.</string>
 </resources>

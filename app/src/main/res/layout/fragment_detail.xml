@@ -2,6 +2,7 @@
 
 <com.nirhart.parallaxscroll.views.ParallaxScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:fab="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     app:alpha_factor="1.4"
@@ -68,6 +69,18 @@
             android:elevation="5dp"
             android:outlineProvider="bounds" />
 
+        <com.melnykov.fab.FloatingActionButton
+            android:id="@+id/movie_fav_fab"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_gravity="bottom|right"
+            android:src="@drawable/ic_favorite_small"
+            fab:fab_colorNormal="@color/fab_normal"
+            fab:fab_colorPressed="@color/fab_ripple"
+            fab:fab_type = "mini"
+            android:layout_marginLeft="135dp"
+            android:layout_above="@+id/detail_divider"/>
+
         <TextView
             android:id="@+id/movie_date_detail"
             style="@android:style/TextAppearance.Material.Medium"
@@ -91,7 +104,7 @@
             android:layout_marginBottom="10dp"
             android:layout_marginEnd="25dp"
             android:layout_marginStart="25dp"
-            android:layout_marginTop="3dp"
+            android:layout_marginTop="20dp"
             android:background="@android:color/darker_gray" />
 
         <TextView

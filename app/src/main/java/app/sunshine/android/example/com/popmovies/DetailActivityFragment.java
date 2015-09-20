@@ -1,8 +1,12 @@
 package app.sunshine.android.example.com.popmovies;
 
 import android.content.ActivityNotFoundException;
+import android.content.ContentUris;
+import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
+import android.database.Cursor;
+import android.database.sqlite.SQLiteDatabase;
 import android.graphics.Bitmap;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
@@ -28,21 +32,28 @@ import android.widget.ProgressBar;
 import android.support.v7.widget.ShareActionProvider;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import com.android.popmovies.app.data.MoviesContract;
+import com.android.popmovies.app.data.MoviesContract.MoviesEntry;
+import com.android.popmovies.app.data.MoviesContract.FavoriteEntry;
+import com.android.popmovies.app.data.MoviesDBHelper;
 import com.android.volley.Request;
 import com.android.volley.RequestQueue;
 import com.android.volley.Response;
 import com.android.volley.VolleyError;
 import com.android.volley.toolbox.JsonObjectRequest;
 import com.android.volley.toolbox.Volley;
+import com.melnykov.fab.FloatingActionButton;
 import com.squareup.picasso.Callback;
 import com.squareup.picasso.Picasso;
 import com.squareup.picasso.Target;
+
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+
 import java.util.ArrayList;
 import java.util.List;
-
 
 
 /**
@@ -66,6 +77,12 @@ public class DetailActivityFragment extends Fragment {
     private RequestQueue mRequestQueue;
     private ShareActionProvider mShareActionProvider;
     private DetailMovieData thisMovieData;
+    private MenuItem shareMenuItem;
+    private String LOG_TAG;
+    private boolean isFavorite;
+    private boolean isMovieInDB;
+    private FloatingActionButton fab;
+    private Toast favToast;
 
     public static DetailActivityFragment newInstance(String id) {
         DetailActivityFragment fragment = new DetailActivityFragment();
@@ -75,20 +92,50 @@ public class DetailActivityFragment extends Fragment {
         return fragment;
     }
 
+    // For testing purposes only!
+    public void deleteAllRecordsFromDB() {
+        MoviesDBHelper dbHelper = new MoviesDBHelper(getActivity());
+        SQLiteDatabase db = dbHelper.getWritableDatabase();
+        db.delete(MoviesContract.MoviesEntry.TABLE_NAME,
+                null,
+                null);
+        db.delete(MoviesContract.FavoriteEntry.TABLE_NAME,
+                null,
+                null);
+
+        db.close();
+
+    }
+
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
         inflater = (LayoutInflater) getActivity().getSystemService(Context.LAYOUT_INFLATER_SERVICE);
         View view = inflater.inflate(R.layout.fragment_detail, container, false);
         movieId = getArguments().getString(Intent.EXTRA_TEXT);
-        RecyclerView recyclerView = (RecyclerView)view.findViewById(R.id.cast_list_view);
+        checkMovieInDB(movieId);
+        checkMovieFavorited(movieId);
+        RecyclerView recyclerView = (RecyclerView) view.findViewById(R.id.cast_list_view);
         castAdapter = new CastViewAdapter(new ArrayList<CastViewObject>());
+        fab = (FloatingActionButton) view.findViewById(R.id.movie_fav_fab);
+
+        if (isFavorite) {
+            fab.setBackgroundColor(getResources().getColor(R.color.fab_ripple));
+        }
+        //  set click listener for floating action bar.
+        fab.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                insertFavorite(thisMovieData);
+            }
+        });
         LinearLayoutManager linearLayoutManager = new LinearLayoutManager(getActivity());
         linearLayoutManager.setOrientation(LinearLayoutManager.HORIZONTAL);
         linearLayoutManager.requestSimpleAnimationsInNextLayout();
         recyclerView.setLayoutManager(linearLayoutManager);
         requestMovieDetails();
         setHasOptionsMenu(true);
+        isTrailerAvailable = true;
         castAdapter.setOnItemClickListener(new CastViewAdapter.OnItemClickListener() {
 
             @Override
@@ -100,6 +147,90 @@ public class DetailActivityFragment extends Fragment {
         recyclerView.setAdapter(castAdapter);
 
         return view;
+    }
+
+    public void saveMovieDetails(DetailMovieData movieData){
+        LOG_TAG = getClass().getSimpleName();
+
+        if(!isMovieInDB) {
+            ContentValues movieValues = new ContentValues();
+            ContentValues favValues = new ContentValues();
+            movieValues.put(MoviesEntry.COLUMN_MOVIE_ID, movieData.getMovieID());
+            movieValues.put(MoviesEntry.COLUMN_MOVIE_TITLE, movieData.getTitle());
+            movieValues.put(MoviesEntry.COLUMN_RUNTIME, movieData.getDuration());
+            movieValues.put(MoviesEntry.COLUMN_BACKDROP, movieData.getBackdropUrl());
+            movieValues.put(MoviesEntry.COLUMN_POSTER, movieData.getImageUrl());
+            movieValues.put(MoviesEntry.COLUMN_RELEASE_YEAR, movieData.getYear());
+            movieValues.put(MoviesEntry.COLUMN_OVERVIEW, movieData.getDescription());
+            movieValues.put(MoviesEntry.COLUMN_RATING, movieData.getRating());
+            favValues.put(FavoriteEntry.COLUMN_MOVIE_ID, movieData.getMovieID());
+            Uri movieUri = getActivity().getContentResolver().insert(MoviesEntry.CONTENT_URI, movieValues);
+            long movieRowID = ContentUris.parseId(movieUri);
+            if (!(movieRowID > 0)) {
+                Log.e(LOG_TAG, "Error inserting favorite to database");
+            }
+        }
+    }
+
+    public void insertFavorite(DetailMovieData movieData) {
+        LOG_TAG = getClass().getSimpleName();
+
+        // insert movie as favorite if not already present.
+        if (!isFavorite && isMovieInDB) {
+            ContentValues favValues = new ContentValues();
+            favValues.put(FavoriteEntry.COLUMN_MOVIE_ID, movieData.getMovieID());
+            Uri favUri = getActivity().getContentResolver().insert(FavoriteEntry.CONTENT_URI, favValues);
+
+            long favRowID = ContentUris.parseId(favUri);
+            if (!(favRowID > 0)) {
+                Log.e(LOG_TAG, "Error inserting favorite to database");
+            } else {
+                fab.setBackgroundColor(getResources().getColor(R.color.fab_ripple));
+                if (favToast != null) {
+                    favToast.cancel();
+                }
+                favToast = Toast.makeText(getActivity(), "Added to favorites", Toast.LENGTH_SHORT);
+                favToast.setGravity(Gravity.BOTTOM, 0, -50);
+                favToast.show();
+                isFavorite = true;
+            }
+
+            // If already marked as favorite, remove from DB.
+        } else {
+
+            getActivity().getContentResolver().delete(FavoriteEntry.CONTENT_URI,
+                    FavoriteEntry.COLUMN_MOVIE_ID + "= ?",
+                    new String[]{movieData.getMovieID()});
+
+            if (favToast != null) {
+                favToast.cancel();
+            }
+            favToast = Toast.makeText(getActivity(), "Removed from favorites", Toast.LENGTH_SHORT);
+            favToast.setGravity(Gravity.BOTTOM, 0, -50);
+            favToast.show();
+            fab.setBackgroundColor(getResources().getColor(R.color.fab_normal));
+            isFavorite = false;
+        }
+    }
+
+    public void checkMovieFavorited(String id) {
+        if(isMovieInDB) {
+            Cursor cursor = getActivity().getContentResolver().query(FavoriteEntry.buildFavDetailWithID(id),
+                    null,
+                    null,
+                    null,
+                    null);
+            isFavorite = cursor.moveToFirst();
+        }
+    }
+
+    public void checkMovieInDB(String id) {
+        Cursor cursor = getActivity().getContentResolver().query(MoviesEntry.CONTENT_URI,
+                new String[]{MoviesEntry.COLUMN_MOVIE_ID},
+                MoviesEntry.TABLE_NAME + "." + MoviesEntry.COLUMN_MOVIE_ID + " = ? ",
+                new String[]{id},
+                null);
+        isMovieInDB = cursor.moveToFirst();
     }
 
     @Override
@@ -137,6 +268,7 @@ public class DetailActivityFragment extends Fragment {
                 try {
                     String posterSize = getString(R.string.detail_poster_size);
                     thisMovieData = parseDetailsFromJson(response.toString(), new DetailMovieData(), posterSize);
+                    saveMovieDetails(thisMovieData);
                     setFragmentViews(thisMovieData);
                     setShareProvider();
                     progressBar.setVisibility(View.GONE);
@@ -253,14 +385,14 @@ public class DetailActivityFragment extends Fragment {
             public void onResponse(JSONObject response) {
                 try {
                     String imdbId = fetchImdbId(response.toString());
-                    if(!imdbId.equals("")) {
+                    if (!imdbId.equals("")) {
                         Uri imdbPage = Uri.parse(getString(R.string.imdb_base_uri) + imdbId);
                         Intent mIntent = new Intent(Intent.ACTION_VIEW, imdbPage);
                         if (mIntent.resolveActivity(getActivity().getPackageManager()) != null) {
                             startActivity(mIntent);
                         }
-                    }else{
-                        Toast.makeText(getActivity(),"No details available for this cast member!",Toast.LENGTH_SHORT).show();
+                    } else {
+                        Toast.makeText(getActivity(), getString(R.string.no_detals_text), Toast.LENGTH_SHORT).show();
                     }
                 } catch (JSONException e) {
                     Log.e(LOG_TAG, "Error reading the response");
@@ -276,10 +408,9 @@ public class DetailActivityFragment extends Fragment {
         return personJsonRequest;
     }
 
-    public String fetchImdbId(String JsonRespString) throws JSONException{
+    public String fetchImdbId(String JsonRespString) throws JSONException {
         JSONObject jsonObject = new JSONObject(JsonRespString);
-        String imdbId = jsonObject.getString(getString(R.string.imdbId));
-        return imdbId;
+        return jsonObject.getString(getString(R.string.imdbId));
     }
 
     public void requestMovieDetails() {
@@ -291,8 +422,8 @@ public class DetailActivityFragment extends Fragment {
     @Override
     public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
         super.onCreateOptionsMenu(menu, inflater);
-        MenuItem shareMenuItem = menu.findItem(R.id.menu_movie_share);
-        mShareActionProvider = (ShareActionProvider)MenuItemCompat.getActionProvider(shareMenuItem);
+        shareMenuItem = menu.findItem(R.id.menu_movie_share);
+        mShareActionProvider = (ShareActionProvider) MenuItemCompat.getActionProvider(shareMenuItem);
     }
 
     public void reviewInformationPopUp(int position) {
@@ -324,6 +455,7 @@ public class DetailActivityFragment extends Fragment {
     public DetailMovieData parseDetailsFromJson(String detailsJsonString, DetailMovieData detailMovieData, String posterSize) throws JSONException {
 
         // These are the names of the JSON objects that need to be extracted.
+        final String MOVIE_ID = "id";
         final String POSTER_TAG = "poster_path";
         final String BASE_POSTER_PATH = getString(R.string.poster_base_path);
         final String TITLE_TAG = "title";
@@ -352,6 +484,7 @@ public class DetailActivityFragment extends Fragment {
         String[] parsedDate = date.split("-");
 
         // Set the detailMovieData object
+        detailMovieData.setMovieID(detailsJson.getString(MOVIE_ID));
         detailMovieData.setImageUrl(imageUrl);
         detailMovieData.setDescription(detailsJson.getString(OVERVIEW_TAG));
         detailMovieData.setDuration(detailsJson.getString(RUNTIME_TAG));
@@ -368,44 +501,49 @@ public class DetailActivityFragment extends Fragment {
             String trailerName = YtTrailerArray.getJSONObject(i).getString(TRAILER_NAME_TAG);
             String trailerId = YtTrailerArray.getJSONObject(i).getString(TRAILER_SOURCE_TAG);
             String trailerUrl = getString(R.string.youtube_base_uri) + trailerId;
-            trailers[i] = new Trailer(trailerName, trailerUrl,trailerId);
+            trailers[i] = new Trailer(trailerName, trailerUrl, trailerId);
+            isTrailerAvailable = true;
         }
 
         JSONObject creditsObject = detailsJson.getJSONObject(CREDITS_TAG);
         JSONArray castsJsonArray = creditsObject.getJSONArray(CAST_TAG);
-        castObjectArray= new ArrayList<CastViewObject>();
-        for(int i=0;i<castsJsonArray.length();i++){
+        castObjectArray = new ArrayList<CastViewObject>();
+        for (int i = 0; i < castsJsonArray.length(); i++) {
             String castName = castsJsonArray.getJSONObject(i).getString(CAST_NAME_TAG);
             String castChar = castsJsonArray.getJSONObject(i).getString(CAST_CHARACTER_TAG);
             String castProfile = castsJsonArray.getJSONObject(i).getString(CAST_PROFILE_TAG);
-            String castImageUrl = getString(R.string.cast_profile_baseURI)+castProfile;
+            String castImageUrl = getString(R.string.cast_profile_baseURI) + castProfile;
             String castID = castsJsonArray.getJSONObject(i).getString(CAST_ID);
-            castObjectArray.add(new CastViewObject(castName,castChar,castImageUrl,castID));
+            castObjectArray.add(new CastViewObject(castName, castChar, castImageUrl, castID));
         }
         detailMovieData.setTrailers(trailers);
         detailMovieData.setCasts(castObjectArray);
         return detailMovieData;
     }
 
-    public void setShareProvider(){
-        if(mShareActionProvider!=null){
-            mShareActionProvider.setShareIntent(createShareIntent());
+    public void setShareProvider() {
+        if (!isTrailerAvailable) {
+            shareMenuItem.setVisible(false);
+        } else {
+            if (mShareActionProvider != null) {
+                mShareActionProvider.setShareIntent(createShareIntent());
+            }
         }
     }
 
-    public Intent createShareIntent(){
+    public Intent createShareIntent() {
         Intent shareIntent = new Intent(Intent.ACTION_SEND);
         String shareString = getString(R.string.share_base_string_1)
-                +": "
-                +thisMovieData.getTrailers()[0].getSource()
+                + ": "
+                + thisMovieData.getTrailers()[0].getSource()
                 + " "
-                +getString(R.string.share_base_string_2)
-                +" '"
-                +thisMovieData.getTitle()
-                +"' "
-                +getString(R.string.share_base_string3);
+                + getString(R.string.share_base_string_2)
+                + " '"
+                + thisMovieData.getTitle()
+                + "' "
+                + getString(R.string.share_base_string3);
         shareIntent.setType("text/plain");
-        shareIntent.putExtra(Intent.EXTRA_TEXT,shareString);
+        shareIntent.putExtra(Intent.EXTRA_TEXT, shareString);
         return shareIntent;
     }
 
@@ -492,7 +630,7 @@ public class DetailActivityFragment extends Fragment {
         }
     }
 
-    public void setCastView(List<CastViewObject> castViewList){
+    public void setCastView(List<CastViewObject> castViewList) {
         castAdapter.setCastViewList(castViewList);
         castAdapter.notifyDataSetChanged();
     }
@@ -500,14 +638,19 @@ public class DetailActivityFragment extends Fragment {
     public void setTrailerViews(Trailer[] trailerData) {
         LayoutInflater inflater = (LayoutInflater) getActivity().getSystemService(Context.LAYOUT_INFLATER_SERVICE);
         LinearLayout layout = (LinearLayout) getActivity().findViewById(R.id.trailer_layout);
-        for (int pos = 0; pos<trailerData.length; pos++) {
+        if (trailerData.length == 0) {
+            isTrailerAvailable = false;
             View v = inflater.inflate(R.layout.trailer_item_layout, null);
-            TextView trailerText = (TextView) v.findViewById(R.id.trailer_name);
-            ImageView playImage = (ImageView)v.findViewById(R.id.video_play_image);
-            if(trailerData.length == 0){
-                trailerText.setText(getString(R.string.no_trailer_text));
-                playImage.setVisibility(View.INVISIBLE);
-            } else {
+            TextView infoText = (TextView) v.findViewById(R.id.trailer_name);
+            ImageView playImage = (ImageView) v.findViewById(R.id.video_play_image);
+            playImage.setVisibility(View.INVISIBLE);
+            infoText.setText(getString(R.string.no_trailer_text));
+            layout.addView(v);
+        } else {
+            for (int pos = 0; pos < trailerData.length; pos++) {
+                View v = inflater.inflate(R.layout.trailer_item_layout, null);
+                TextView trailerText = (TextView) v.findViewById(R.id.trailer_name);
+                ImageView playImage = (ImageView) v.findViewById(R.id.video_play_image);
                 final Trailer currentTrailer = trailerData[pos];
                 v.setOnClickListener(new View.OnClickListener() {
                     @Override
@@ -524,9 +667,8 @@ public class DetailActivityFragment extends Fragment {
 
                 trailerText.setText(trailerData[pos].getTrailerName());
                 playImage.setVisibility(View.VISIBLE);
+                layout.addView(v);
             }
-            layout.addView(v);
         }
     }
-
 }

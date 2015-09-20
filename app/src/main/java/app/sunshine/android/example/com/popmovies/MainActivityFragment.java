@@ -320,7 +320,6 @@ public class MainActivityFragment extends Fragment {
             // These are the names of the JSON objects that need to be extracted.
             final String POSTER_TAG = "poster_path";
             final String RESULTS_TAG = "results";
-            final String BACKDROP_PATH = "backdrop_path";
             final String BASE_POSTER_PATH = getString(R.string.poster_base_path);
             final String IDS_TAG = "id";
             final String TITLE_TAG = "title";
@@ -332,15 +331,12 @@ public class MainActivityFragment extends Fragment {
                 movieIds = new ArrayList<>();
 
             movieGridObjects = new ArrayList<>();
-
-            List<String> posterArray = new ArrayList<>();
             JSONArray resultsArray = moviesJSON.getJSONArray(RESULTS_TAG);
             for (int i = 0; i < resultsArray.length(); i++) {
                 GridViewObject gridViewObject = new GridViewObject();
                 JSONObject resultObject = resultsArray.getJSONObject(i);
                 gridViewObject.setMovieUrl(BASE_POSTER_PATH + posterSize + resultObject.getString(POSTER_TAG));
                 gridViewObject.setMovieTag(resultObject.getString(TITLE_TAG));
-                gridViewObject.setBackDropURL(resultObject.getString(BACKDROP_PATH));
                 movieGridObjects.add(gridViewObject);
                 movieIds.add(resultObject.getString(IDS_TAG));
             }

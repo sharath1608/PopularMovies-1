@@ -7,6 +7,7 @@ import java.util.ArrayList;
  */
 public class DetailMovieData {
 
+    private String movieID;
     private String title;
     private String imageUrl;
     private String description;
@@ -26,6 +27,14 @@ public class DetailMovieData {
 
     public String getBackdropUrl() {
         return backdropUrl;
+    }
+
+    public String getMovieID() {
+        return movieID;
+    }
+
+    public void setMovieID(String movieID) {
+        this.movieID = movieID;
     }
 
     public void setBackdropUrl(String backdropUrl) {
