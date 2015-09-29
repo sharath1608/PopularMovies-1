@@ -7,7 +7,6 @@ import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
 import android.database.Cursor;
-import android.database.sqlite.SQLiteDatabase;
 import android.graphics.Bitmap;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
@@ -33,13 +32,11 @@ import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
-import com.android.popmovies.app.data.MoviesContract;
 import com.android.popmovies.app.data.MoviesContract.FavoriteEntry;
 import com.android.popmovies.app.data.MoviesContract.MoviesEntry;
 import com.android.popmovies.app.data.MoviesContract.ReviewsEntry;
 import com.android.popmovies.app.data.MoviesContract.TrailerEntry;
 import com.android.popmovies.app.data.MoviesContract.CastEntry;
-import com.android.popmovies.app.data.MoviesDBHelper;
 import com.android.volley.Request;
 import com.android.volley.RequestQueue;
 import com.android.volley.Response;
@@ -50,12 +47,12 @@ import com.melnykov.fab.FloatingActionButton;
 import com.squareup.picasso.Callback;
 import com.squareup.picasso.Picasso;
 import com.squareup.picasso.Target;
-
+import android.support.v4.app.LoaderManager;
+import android.support.v4.content.CursorLoader;
+import android.support.v4.content.Loader;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
-
-import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -63,11 +60,15 @@ import java.util.List;
 /**
  * A placeholder fragment containing a simple view.
  */
-public class DetailActivityFragment extends Fragment {
+public class DetailActivityFragment extends Fragment implements LoaderManager.LoaderCallbacks<Cursor> {
 
     private String movieId;
+    private final int MOVIE_LOADER = 0;
+    private final int FAV_LOADER = 1;
+    private final int TRAILER_LOADER = 2;
+    private final int REVIEW_LOADER = 3;
+    private final int CAST_LOADER = 4;
     private Toast noConnectToast;
-    private TextView movieTitleView;
     private Target loadTarget;
     private ProgressBar progressBar;
     private final String API_REQ_STRING = "api_key";
@@ -87,10 +88,13 @@ public class DetailActivityFragment extends Fragment {
     private boolean isCastInDB;
     private FloatingActionButton fab;
     private Toast favToast;
-    private Cursor movieCursor;
-    private Cursor reviewCursor;
-    private Cursor trailerCursor;
-    private Cursor castCursor;
+    private int viewCount;
+    private TextView movieRatingView;
+    private TextView movieTitleView;
+    private TextView movieDateView;
+    private TextView movieDurationView;
+    private TextView movieDescriptionView;
+    private ImageView movieImageView;
 
     public static DetailActivityFragment newInstance(String id) {
         DetailActivityFragment fragment = new DetailActivityFragment();
@@ -100,27 +104,13 @@ public class DetailActivityFragment extends Fragment {
         return fragment;
     }
 
-    // For testing purposes only!
-    public void deleteAllRecordsFromDB() {
-        MoviesDBHelper dbHelper = new MoviesDBHelper(getActivity());
-        SQLiteDatabase db = dbHelper.getWritableDatabase();
-        db.delete(MoviesContract.MoviesEntry.TABLE_NAME,
-                null,
-                null);
-        db.delete(MoviesContract.FavoriteEntry.TABLE_NAME,
-                null,
-                null);
-
-        db.close();
-
-    }
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
+
         inflater = (LayoutInflater) getActivity().getSystemService(Context.LAYOUT_INFLATER_SERVICE);
         View view = inflater.inflate(R.layout.fragment_detail, container, false);
-        //deleteAllRecordsFromDB();
         isTrailerInDB = false;
         isCastInDB = false;
         isReviewInDB = false;
@@ -128,45 +118,202 @@ public class DetailActivityFragment extends Fragment {
         mRequestQueue = Volley.newRequestQueue(getActivity());
         thisMovieData = new DetailMovieData();
         movieId = getArguments().getString(Intent.EXTRA_TEXT);
+
+        movieTitleView = (TextView) view.findViewById(R.id.movie_title_detail);
+        movieRatingView = (TextView) view.findViewById(R.id.move_rating_detail);
+        movieDateView = (TextView) view.findViewById(R.id.movie_date_detail);
+        movieDurationView = (TextView) view.findViewById(R.id.movie_time_detail);
+        movieDescriptionView = (TextView) view.findViewById(R.id.movie_description_detail);
+        movieImageView = (ImageView) view.findViewById(R.id.movie_image_detail);
+
         castAdapter = new CastViewAdapter(new ArrayList<CastViewObject>());
         fab = (FloatingActionButton) view.findViewById(R.id.movie_fav_fab);
         progressBar = (ProgressBar) view.findViewById(R.id.progressBar_detail);
-        movieCursor = checkMovieInDB(movieId);
-        checkMovieFavorited(movieId);
         RecyclerView recyclerView = (RecyclerView) view.findViewById(R.id.cast_list_view);
-
-        if (isFavorite) {
-            fab.setBackgroundColor(getResources().getColor(R.color.fab_ripple));
-        }
-
-        //  set click listener for floating action bar.
-        fab.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                insertFavorite(thisMovieData);
-            }
-        });
-
         LinearLayoutManager castLayoutManager = new LinearLayoutManager(getActivity());
         castLayoutManager.setOrientation(LinearLayoutManager.HORIZONTAL);
         castLayoutManager.requestSimpleAnimationsInNextLayout();
         recyclerView.setLayoutManager(castLayoutManager);
-
-        setHasOptionsMenu(true);
         castAdapter.setOnItemClickListener(new CastViewAdapter.OnItemClickListener() {
-
             @Override
             public void onItemClick(View v, int position) {
                 CastViewObject chosenCast = thisMovieData.getCasts().get(position);
                 mRequestQueue.add(getPersonRequest(chosenCast.getCastId()));
             }
         });
+
+
+        setHasOptionsMenu(true);
         recyclerView.setAdapter(castAdapter);
         return view;
     }
 
+    @Override
+    public void onActivityCreated(Bundle savedInstanceState) {
+        viewCount = 0;
+        getLoaderManager().initLoader(MOVIE_LOADER, null, this);
+        getLoaderManager().initLoader(FAV_LOADER, null, this);
+        getLoaderManager().initLoader(REVIEW_LOADER, null, this);
+        getLoaderManager().initLoader(TRAILER_LOADER, null, this);
+        getLoaderManager().initLoader(CAST_LOADER, null, this);
+        super.onActivityCreated(savedInstanceState);
+    }
+
+    @Override
+    public Loader onCreateLoader(int id, Bundle args) {
+        Loader detailLoader = null;
+        switch (id) {
+            case MOVIE_LOADER:
+                detailLoader = new CursorLoader(getActivity(),
+                        MoviesEntry.CONTENT_URI,
+                        null,
+                        MoviesEntry.TABLE_NAME + "." + MoviesEntry.COLUMN_MOVIE_ID + " = ? ",
+                        new String[]{movieId},
+                        null);
+                break;
+            case FAV_LOADER:
+                detailLoader = new CursorLoader(getActivity(),
+                        FavoriteEntry.buildFavDetailWithID(movieId),
+                        new String[]{FavoriteEntry._ID},
+                        null,
+                        null,
+                        null);
+                break;
+            case REVIEW_LOADER:
+                detailLoader = new CursorLoader(getActivity(),
+                        ReviewsEntry.buildReviewsWithID(movieId),
+                        new String[]{ReviewsEntry._ID},
+                        null,
+                        null,
+                        null);
+                break;
+
+            case TRAILER_LOADER:
+                detailLoader = new CursorLoader(getActivity(),
+                        TrailerEntry.buildTrailerswithID(movieId),
+                        new String[]{TrailerEntry._ID},
+                        null,
+                        null,
+                        null);
+                break;
+            case CAST_LOADER:
+                detailLoader = new CursorLoader(getActivity(),
+                        CastEntry.buildCastWithID(movieId),
+                        new String[]{CastEntry.COLUMN_CAST_ID},
+                        null,
+                        null,
+                        null);
+                break;
+        }
+        return detailLoader;
+    }
+
+    @Override
+    public void onLoadFinished(Loader<Cursor> loader, Cursor data) {
+
+        switch (loader.getId()) {
+            case MOVIE_LOADER:
+                viewCount++;
+                if (data.moveToFirst()) {
+                    isMovieInDB = true;
+                    thisMovieData.setMovieID(data.getString(data.getColumnIndex(MoviesEntry.COLUMN_MOVIE_ID)));
+                    thisMovieData.setImageUrl(data.getString(data.getColumnIndex(MoviesEntry.COLUMN_POSTER)));
+                    thisMovieData.setDescription(data.getString(data.getColumnIndex(MoviesEntry.COLUMN_OVERVIEW)));
+                    thisMovieData.setDuration(data.getString(data.getColumnIndex(MoviesEntry.COLUMN_RUNTIME)));
+                    thisMovieData.setRating(data.getString(data.getColumnIndex(MoviesEntry.COLUMN_RATING)));
+                    thisMovieData.setYear(data.getString(data.getColumnIndex(MoviesEntry.COLUMN_RELEASE_YEAR)));
+                    thisMovieData.setTitle(data.getString(data.getColumnIndex(MoviesEntry.COLUMN_MOVIE_TITLE)));
+                    thisMovieData.setBackdropUrl(data.getString(data.getColumnIndex(MoviesEntry.COLUMN_BACKDROP)));
+                } else {
+                    isMovieInDB = false;
+                }
+                break;
+            case FAV_LOADER:
+                if (data.moveToFirst()) {
+                    fab.setBackgroundColor(getResources().getColor(R.color.fab_ripple));
+                    isFavorite = true;
+                } else {
+                    isFavorite = false;
+                }
+                break;
+
+            case REVIEW_LOADER:
+                viewCount++;
+                Review[] reviewsDB;
+                if (data.moveToFirst()) {
+                    isReviewInDB = true;
+                    reviewsDB = new Review[data.getCount()];
+                    int index = 0;
+                    do {
+                        String author = data.getString(data.getColumnIndex(ReviewsEntry.COLUMN_REVIEW_AUTHOR));
+                        String reviewText = data.getString(data.getColumnIndex(ReviewsEntry.COLUMN_REVIEW_TEXT));
+                        reviewText = reviewText + " - " + author;
+                        Review thisReview = new Review();
+                        thisReview.setAuthor(author);
+                        thisReview.setReviewText(reviewText);
+                        reviewsDB[index++] = thisReview;
+                    } while (data.moveToNext());
+                } else {
+                    Review reviewObject = new Review();
+                    reviewObject.setReviewText(getString(R.string.no_review_text));
+                    reviewsDB = new Review[]{reviewObject};
+                }
+                thisMovieData.setReviews(reviewsDB);
+                break;
+
+            case TRAILER_LOADER:
+                viewCount++;
+                if (data.moveToFirst()) {
+                    isTrailerInDB = true;
+                    int index = 0;
+                    Trailer[] trailersDB = new Trailer[data.getCount()];
+                    do {
+                        Trailer thisTrailer = new Trailer();
+                        thisTrailer.setTrailerId(data.getString(data.getColumnIndex(TrailerEntry.COLUMN_TRAILER_ID)));
+                        thisTrailer.setTrailerName(data.getString(data.getColumnIndex(TrailerEntry.COLUMN_TRAILER_TITLE)));
+                        thisTrailer.setSource(data.getString(data.getColumnIndex(TrailerEntry.COLUMN_TRAILER_URI)));
+                        trailersDB[index++] = thisTrailer;
+                    } while (data.moveToNext());
+                    thisMovieData.setTrailers(trailersDB);
+                }
+                break;
+
+            case CAST_LOADER:
+                viewCount++;
+                if (data.moveToFirst()) {
+                    ArrayList<CastViewObject> castsDB = new ArrayList<CastViewObject>();
+                    isCastInDB = true;
+                    do {
+                        String castName = data.getString(data.getColumnIndex(CastEntry.COLUMN_CAST_NAME));
+                        String castURI = data.getString(data.getColumnIndex(CastEntry.COLUMN_CAST_URI));
+                        String castID = data.getString(data.getColumnIndex(CastEntry.COLUMN_CAST_ID));
+                        CastViewObject cast = new CastViewObject(castName, castURI, castID);
+                        castsDB.add(cast);
+                    } while (data.moveToNext());
+                    thisMovieData.setCasts(castsDB);
+                }
+                break;
+            default:
+                throw new UnsupportedOperationException("loader could not be matched to pre-defined loaders");
+        }
+
+        if (viewCount == 4) {
+            if (isMovieInDB) {
+                setFragmentViews();
+            }
+            viewCount = 0;
+        }
+    }
+
+    @Override
+    public void onLoaderReset(Loader<Cursor> loader) {
+
+    }
+
     public void saveMovieDetails() {
         LOG_TAG = getClass().getSimpleName();
+        long movieRowID;
+        int numRows;
         if (!isMovieInDB) {
             ContentValues movieValues = new ContentValues();
             ContentValues favValues = new ContentValues();
@@ -181,7 +328,7 @@ public class DetailActivityFragment extends Fragment {
             favValues.put(FavoriteEntry.COLUMN_MOVIE_ID, movieId);
 
             Uri movieUri = getActivity().getContentResolver().insert(MoviesEntry.CONTENT_URI, movieValues);
-            long movieRowID = ContentUris.parseId(movieUri);
+            movieRowID = ContentUris.parseId(movieUri);
             if (!(movieRowID > 0)) {
                 Log.e(LOG_TAG, "Error inserting favorite to database");
             } else {
@@ -200,7 +347,14 @@ public class DetailActivityFragment extends Fragment {
                 value.put(TrailerEntry.COLUMN_TRAILER_ID, trailer.getTrailerId());
                 trailerValues[index++] = value;
             }
-            getActivity().getContentResolver().bulkInsert(TrailerEntry.buildTrailerswithID(movieId), trailerValues);
+            numRows = getActivity().getContentResolver().bulkInsert(TrailerEntry.buildTrailerswithID(movieId), trailerValues);
+
+            // If no trailers/reviews/cast present, the viewCount must increment.
+            if (numRows > 0) {
+                isTrailerInDB = true;
+            } else{
+                viewCount++;
+            }
         }
 
         if (!isCastInDB) {
@@ -215,21 +369,14 @@ public class DetailActivityFragment extends Fragment {
                 value.put(CastEntry.COLUMN_MOVIE_ID, thisMovieData.getMovieID());
                 castValues[index++] = value;
             }
-            getActivity().getContentResolver().bulkInsert(CastEntry.buildCastWithID(movieId), castValues);
+            numRows = getActivity().getContentResolver().bulkInsert(CastEntry.buildCastWithID(movieId), castValues);
+            if (numRows > 0) {
+                isCastInDB = true;
+            } else{
+                viewCount++;
+            }
         }
     }
-
-
-//    public void bulkInsertDetails(Object[] detailArray,String[] cols,Class klass){
-//        ContentValues[] detailValues = new ContentValues[detailArray.length];
-//        Field[] fields = klass.getDeclaredFields();
-//        for(int i=0;i<detailArray.length;i++){
-//            ContentValues values = new ContentValues();
-//            for()
-//            detailValues[i] = values;
-//        }
-//        getActivity().getContentResolver().bulkInsert(TrailerEntry.buildTrailerswithID(movieId), detailValues);
-//    }
 
     public void saveReviewDetails() {
         if (!isReviewInDB) {
@@ -292,81 +439,11 @@ public class DetailActivityFragment extends Fragment {
         favToast.show();
     }
 
-    public void checkMovieFavorited(String id) {
-
-        if (isMovieInDB) {
-            Cursor cursor = getActivity().getContentResolver().query(FavoriteEntry.buildFavDetailWithID(id),
-                    null,
-                    null,
-                    null,
-                    null);
-            isFavorite = cursor.moveToFirst();
-        }
-    }
-
-    public Cursor checkMovieInDB(String id) {
-        Cursor cursor = getActivity().getContentResolver().query(MoviesEntry.CONTENT_URI,
-                null,
-                MoviesEntry.TABLE_NAME + "." + MoviesEntry.COLUMN_MOVIE_ID + " = ? ",
-                new String[]{id},
-                null);
-
-        checkReviewInDB();
-        checkTrailerInDB();
-        checkCastInDB();
-
-        isMovieInDB = cursor.moveToFirst();
-        return cursor;
-    }
-
-    public void checkReviewInDB() {
-        reviewCursor = getActivity().getContentResolver().query(ReviewsEntry.buildReviewsWithID(movieId),
-                null,
-                null,
-                null,
-                null);
-        ;
-        isReviewInDB = reviewCursor.moveToFirst();
-    }
-
-    public void checkTrailerInDB() {
-        trailerCursor = getActivity().getContentResolver().query(TrailerEntry.buildTrailerswithID(movieId),
-                null,
-                null,
-                null,
-                null);
-        isTrailerInDB = trailerCursor.moveToFirst();
-    }
-
-    public void checkCastInDB() {
-        castCursor = getActivity().getContentResolver().query(CastEntry.buildCastWithID(movieId),
-                null,
-                null,
-                null,
-                null);
-
-        isCastInDB = castCursor.moveToFirst();
-    }
-
     @Override
     public void onStart() {
         super.onStart();
+        requestMovieDetails();
 
-        // If the movie details are already in memory, just set the views.
-        if (thisMovieData.getMovieID() == null) {
-            // if movie is in DB, fetch it else make a HTTP request.
-
-            if (isMovieInDB) {
-                readDetailsFromCursor(movieCursor);
-            } else {
-                requestMovieDetails();
-            }
-        }
-    }
-
-    @Override
-    public void onSaveInstanceState(Bundle outState) {
-        super.onSaveInstanceState(outState);
     }
 
     @Override
@@ -392,8 +469,9 @@ public class DetailActivityFragment extends Fragment {
                 try {
                     String posterSize = getString(R.string.detail_poster_size);
                     parseDetailsFromJson(response.toString(), posterSize);
-                    saveMovieDetails();
-                    setFragmentViews();
+                    if (!isMovieInDB) {
+                        saveMovieDetails();
+                    }
                     progressBar.setVisibility(View.GONE);
                 } catch (JSONException e) {
                     Log.e(LOG_TAG, "Error reading the response");
@@ -476,6 +554,8 @@ public class DetailActivityFragment extends Fragment {
 
         if (resultsArray.length() > 0) {
             saveReviewDetails();
+        } else {
+            viewCount++;
         }
     }
 
@@ -488,13 +568,15 @@ public class DetailActivityFragment extends Fragment {
             View v = inflater.inflate(R.layout.review_item_layout, null);
             TextView reviewText = (TextView) v.findViewById(R.id.movie_review_text);
 
-            reviewText.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    String reviewPos = fullReviewList.get(finalPos);
-                    extendedInfoPopUp(reviewPos,getString(R.string.review));
-                }
-            });
+            if(isReviewInDB) {
+                reviewText.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        String reviewPos = fullReviewList.get(finalPos);
+                        extendedInfoPopUp(reviewPos, getString(R.string.review));
+                    }
+                });
+            }
 
             reviewText.setText(reviewObjects[pos].getReviewText());
             layout.addView(v);
@@ -553,9 +635,7 @@ public class DetailActivityFragment extends Fragment {
     public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
         super.onCreateOptionsMenu(menu, inflater);
         shareMenuItem = menu.findItem(R.id.menu_movie_share);
-        shareMenuItem.setVisible(false);
         mShareActionProvider = (ShareActionProvider) MenuItemCompat.getActionProvider(shareMenuItem);
-        setShareProvider();
     }
 
     public void parseDetailsFromJson(String detailsJsonString, String posterSize) throws JSONException {
@@ -577,7 +657,6 @@ public class DetailActivityFragment extends Fragment {
         final String CREDITS_TAG = "credits";
         final String CAST_TAG = "cast";
         final String CAST_NAME_TAG = "name";
-        final String CAST_CHARACTER_TAG = "character";
         final String CAST_PROFILE_TAG = "profile_path";
         final String CAST_ID = "id";
 
@@ -607,7 +686,6 @@ public class DetailActivityFragment extends Fragment {
             String trailerId = YtTrailerArray.getJSONObject(i).getString(TRAILER_SOURCE_TAG);
             String trailerUrl = getString(R.string.youtube_base_uri) + trailerId;
             trailers[i] = new Trailer(trailerName, trailerUrl, trailerId);
-            shareMenuItem.setVisible(true);
         }
 
         JSONObject creditsObject = detailsJson.getJSONObject(CREDITS_TAG);
@@ -622,7 +700,6 @@ public class DetailActivityFragment extends Fragment {
         }
         thisMovieData.setTrailers(trailers);
         thisMovieData.setCasts(castObjectArray);
-        setShareProvider();
     }
 
     public void setShareProvider() {
@@ -632,23 +709,19 @@ public class DetailActivityFragment extends Fragment {
     }
 
     public Intent createShareIntent() {
-        if (thisMovieData.getTrailers() != null && thisMovieData.getTrailers().length > 0) {
-            shareMenuItem.setVisible(true);
-            Intent shareIntent = new Intent(Intent.ACTION_SEND);
-            String shareString = getString(R.string.share_base_string_1)
-                    + ": "
-                    + thisMovieData.getTrailers()[0].getSource()
-                    + " "
-                    + getString(R.string.share_base_string_2)
-                    + " '"
-                    + thisMovieData.getTitle()
-                    + "' "
-                    + getString(R.string.share_base_string3);
-            shareIntent.setType("text/plain");
-            shareIntent.putExtra(Intent.EXTRA_TEXT, shareString);
-            return shareIntent;
-        }
-        return null;
+        Intent shareIntent = new Intent(Intent.ACTION_SEND);
+        String shareString = getString(R.string.share_base_string_1)
+                + ": "
+                + thisMovieData.getTrailers()[0].getSource()
+                + " "
+                + getString(R.string.share_base_string_2)
+                + " '"
+                + thisMovieData.getTitle()
+                + "' "
+                + getString(R.string.share_base_string3);
+        shareIntent.setType("text/plain");
+        shareIntent.putExtra(Intent.EXTRA_TEXT, shareString);
+        return shareIntent;
     }
 
     public void loadBackgroundImage(String backdropUrl) {
@@ -681,28 +754,27 @@ public class DetailActivityFragment extends Fragment {
     public void setFragmentViews() {
         final int layoutWidth = 342;
         final int layoutHeight = 513;
-        final ImageView imageView;
         final ProgressBar thisProgressBar = progressBar;
         String LOG_TAG = this.getClass().getSimpleName();
         try {
-            movieTitleView = (TextView) getActivity().findViewById(R.id.movie_title_detail);
-            TextView movieRatingView = (TextView) getActivity().findViewById(R.id.move_rating_detail);
-            TextView movieDateView = (TextView) getActivity().findViewById(R.id.movie_date_detail);
-            TextView movieDurationView = (TextView) getActivity().findViewById(R.id.movie_time_detail);
-            TextView movieDescriptionView = (TextView) getActivity().findViewById(R.id.movie_description_detail);
-            imageView = (ImageView) getActivity().findViewById(R.id.movie_image_detail);
-            android.view.ViewGroup.LayoutParams layoutParams = imageView.getLayoutParams();
+            android.view.ViewGroup.LayoutParams layoutParams = movieImageView.getLayoutParams();
             layoutParams.width = layoutWidth;
             layoutParams.height = layoutHeight;
-            imageView.setLayoutParams(layoutParams);
+            movieImageView.setLayoutParams(layoutParams);
             ImageView starImageView = (ImageView) getActivity().findViewById(R.id.starImage);
             starImageView.setImageResource(R.drawable.full_star);
+            fab.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    insertFavorite(thisMovieData);
+                }
+            });
 
             PicassoImageCache
                     .getPicassoInstance(getActivity())
                     .load(thisMovieData.getImageUrl())
                     .error(R.drawable.user_placeholder_image)
-                    .into(imageView, new Callback() {
+                    .into(movieImageView, new Callback() {
                         @Override
                         public void onSuccess() {
                             loadBackgroundImage(thisMovieData.getBackdropUrl());
@@ -729,11 +801,12 @@ public class DetailActivityFragment extends Fragment {
                 movieDescriptionView.setText(getString(R.string.no_overview));
             } else {
                 final String description = thisMovieData.getDescription();
-                movieDescriptionView.setText(snipDescription(description));
+                String shortDescription = Utilities.snipTextForView(description);
+                movieDescriptionView.setText(shortDescription);
                 movieDescriptionView.setOnClickListener(new View.OnClickListener() {
                     @Override
                     public void onClick(View v) {
-                        extendedInfoPopUp(description,getString(R.string.overview));
+                        extendedInfoPopUp(description, getString(R.string.overview));
                     }
                 });
             }
@@ -747,13 +820,8 @@ public class DetailActivityFragment extends Fragment {
         }
     }
 
-    public String snipDescription(String overviewText){
-        int start = 0;
-        int end = 300;
-        return overviewText.length()>end?(overviewText.substring(start,end) + " ..."):overviewText;
-    }
 
-    public void extendedInfoPopUp(String extendedInfo, String popupTitle){
+    public void extendedInfoPopUp(String extendedInfo, String popupTitle) {
         final AlertDialog builder = new AlertDialog.Builder(getActivity()).create();
         LayoutInflater layoutInflater = (LayoutInflater) getActivity().getSystemService(Context.LAYOUT_INFLATER_SERVICE);
         View view = layoutInflater.inflate(R.layout.review_dialog_layout, null);
@@ -789,7 +857,7 @@ public class DetailActivityFragment extends Fragment {
         LayoutInflater inflater = (LayoutInflater) getActivity().getSystemService(Context.LAYOUT_INFLATER_SERVICE);
         LinearLayout layout = (LinearLayout) getActivity().findViewById(R.id.trailer_layout);
 
-        if (trailerData.length == 0) {
+        if (trailerData == null || trailerData.length == 0) {
             View v = inflater.inflate(R.layout.trailer_item_layout, null);
             TextView infoText = (TextView) v.findViewById(R.id.trailer_name);
             ImageView playImage = (ImageView) v.findViewById(R.id.video_play_image);
@@ -816,82 +884,10 @@ public class DetailActivityFragment extends Fragment {
                 });
 
                 trailerText.setText(trailerData[pos].getTrailerName());
+                setShareProvider();
                 playImage.setVisibility(View.VISIBLE);
                 layout.addView(v);
             }
-        }
-    }
-
-    // Get movie details from cursor and set views
-    public void readDetailsFromCursor(Cursor cursor) {
-        thisMovieData.setMovieID(cursor.getString(cursor.getColumnIndex(MoviesEntry.COLUMN_MOVIE_ID)));
-        thisMovieData.setImageUrl(cursor.getString(cursor.getColumnIndex(MoviesEntry.COLUMN_POSTER)));
-        thisMovieData.setDescription(cursor.getString(cursor.getColumnIndex(MoviesEntry.COLUMN_OVERVIEW)));
-        thisMovieData.setDuration(cursor.getString(cursor.getColumnIndex(MoviesEntry.COLUMN_RUNTIME)));
-        thisMovieData.setRating(cursor.getString(cursor.getColumnIndex(MoviesEntry.COLUMN_RATING)));
-        thisMovieData.setYear(cursor.getString(cursor.getColumnIndex(MoviesEntry.COLUMN_RELEASE_YEAR)));
-        thisMovieData.setTitle(cursor.getString(cursor.getColumnIndex(MoviesEntry.COLUMN_MOVIE_TITLE)));
-        thisMovieData.setBackdropUrl(cursor.getString(cursor.getColumnIndex(MoviesEntry.COLUMN_BACKDROP)));
-        readReviewsFromCursor();
-        readTrailersFromCursor();
-        readCastFromCursor();
-        setFragmentViews();
-    }
-
-    public void readCastFromCursor() {
-        ArrayList<CastViewObject> castsDB = new ArrayList<CastViewObject>();
-        if (castCursor.getCount() > 0) {
-            if (castCursor.moveToFirst()) {
-                do {
-                    String castName = castCursor.getString(castCursor.getColumnIndex(CastEntry.COLUMN_CAST_NAME));
-                    String castURI = castCursor.getString(castCursor.getColumnIndex(CastEntry.COLUMN_CAST_URI));
-                    String castID = castCursor.getString(castCursor.getColumnIndex(CastEntry.COLUMN_CAST_ID));
-                    CastViewObject cast = new CastViewObject(castName,castURI,castID);
-                    castsDB.add(cast);
-                } while (castCursor.moveToNext());
-            }
-        }
-        thisMovieData.setCasts(castsDB);
-    }
-
-    public void readReviewsFromCursor() {
-        Review[] reviewsDB;
-        if (reviewCursor.getCount() > 0) {
-            reviewsDB = new Review[reviewCursor.getCount()];
-            int index = 0;
-            if (reviewCursor.moveToFirst()) {
-                do {
-                    String author = reviewCursor.getString(reviewCursor.getColumnIndex(ReviewsEntry.COLUMN_REVIEW_AUTHOR));
-                    String reviewText = reviewCursor.getString(reviewCursor.getColumnIndex(ReviewsEntry.COLUMN_REVIEW_TEXT));
-                    reviewText = reviewText + " - " + author;
-                    Review thisReview = new Review();
-                    thisReview.setAuthor(author);
-                    thisReview.setReviewText(reviewText);
-                    reviewsDB[index++] = thisReview;
-                } while (reviewCursor.moveToNext());
-            }
-        } else {
-            Review reviewObject = new Review();
-            reviewObject.setReviewText(getString(R.string.no_review_text));
-            reviewsDB = new Review[]{reviewObject};
-        }
-        thisMovieData.setReviews(reviewsDB);
-    }
-
-    public void readTrailersFromCursor() {
-        if (trailerCursor.getCount() > 0) {
-            int index = 0;
-            Trailer[] trailersDB = new Trailer[trailerCursor.getCount()];
-            if (trailerCursor.moveToFirst()) {
-                do {
-                    Trailer thisTrailer = new Trailer();
-                    thisTrailer.setTrailerId(trailerCursor.getString(trailerCursor.getColumnIndex(TrailerEntry.COLUMN_TRAILER_ID)));
-                    thisTrailer.setTrailerName(trailerCursor.getString(trailerCursor.getColumnIndex(TrailerEntry.COLUMN_TRAILER_TITLE)));
-                    thisTrailer.setSource(trailerCursor.getString(trailerCursor.getColumnIndex(TrailerEntry.COLUMN_TRAILER_URI)));
-                    trailersDB[index++] = thisTrailer;
-                } while (trailerCursor.moveToNext());
-            }
-            thisMovieData.setTrailers(trailersDB);
         }
     }
 }
