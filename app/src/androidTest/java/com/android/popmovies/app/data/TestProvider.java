@@ -38,7 +38,7 @@ public class TestProvider extends AndroidTestCase{
 
 
     public void testInsertReadProvider() {
-        ContentValues movieValues = TestUtilities.createMovieRecord();
+        ContentValues movieValues = TestUtilities.createMovieRecord(mContext);
 
         // Register a content observer for our insert.  This time, directly with the content resolver
         TestUtilities.TestContentObserver tco = TestUtilities.TestContentObserver.getTestContentObserver();
@@ -77,9 +77,9 @@ public class TestProvider extends AndroidTestCase{
 
         getContext().getContentResolver().registerContentObserver(MoviesContract.FavoriteEntry.CONTENT_URI, true, tco);
 
-        Uri weatherInsertUri = getContext().getContentResolver()
+        Uri FavInsertUri = getContext().getContentResolver()
                 .insert(MoviesContract.FavoriteEntry.CONTENT_URI, favContentValues);
-        assertTrue(weatherInsertUri != null);
+        assertTrue(FavInsertUri != null);
 
         // Did our content observer get called?  Students:  If this fails, your insert weather
         // in your ContentProvider isn't calling
@@ -100,7 +100,6 @@ public class TestProvider extends AndroidTestCase{
         TestUtilities.validateCursor("testInsertReadProvider. Error validating MovieEntry insert.",
                 favCursor, TestUtilities.favoriteMovieValue());
 
-
         // Get the joined Weather and Location data with a start date
         Cursor favDetailCursor = getContext().getContentResolver().query(
                 MoviesContract.FavoriteEntry.buildFavDetailWithID(TestUtilities.MOVIE_ID),
@@ -118,6 +117,32 @@ public class TestProvider extends AndroidTestCase{
 
         TestUtilities.validateCursor("testInsertReadProvider. Error validating MovieEntry insert.",
                 favDetailCursor, TestUtilities.favoriteDetailValue());
+
+        ContentValues[] trailerValues = TestUtilities.createTrailerRecord(mContext);
+
+        int res = getContext().getContentResolver()
+                .bulkInsert(MoviesContract.TrailerEntry.buildTrailerswithID(TestUtilities.MOVIE_ID), trailerValues);
+
+        assertTrue("Error inserting trailers",res>0);
+
+        Cursor trailerCursor = getContext().getContentResolver().query(
+                MoviesContract.TrailerEntry.buildTrailerswithID(TestUtilities.MOVIE_ID), // Table to Query
+                new String[]{MoviesContract.MoviesEntry.COLUMN_MOVIE_TITLE,
+                        MoviesContract.MoviesEntry.COLUMN_POSTER}, // leaving "columns" null just returns all the columns
+                null, // cols for "where" clause
+                null, // values for "where" clause
+                null // columns to group by
+        );
+
+        if(trailerCursor.moveToFirst()){
+            int index = 0;
+            do{
+                TestUtilities.validateCursor("testInsertReadProvider. Error validating TrailerEntry insert.",
+                        trailerCursor, trailerValues[index++]);
+            }while(trailerCursor.moveToNext());
+        }
+
+
     }
 
     public void deleteAllRecords() {

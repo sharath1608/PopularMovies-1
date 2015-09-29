@@ -28,15 +28,11 @@ public class TestUtilities extends AndroidTestCase{
     private static String ratingTestString_1 = "4.5";
     private static String titleTestString_1 = "fake title";
     private static String timeTestString_1 = "145";
-    private byte[] posterImageBlob_1 = null;
-    private byte[] backdropImageBlobl_1 = null;
-    private static int posterRes_1 = R.drawable.max_max_poster;
-    private static int backdropRes_1 = R.drawable.mad_max_backdrop;
     private static String posterID_1 = "t90Y3G8UGQp0f0DrP60wRu9gfrH";
     private static String backdropID_1 = "tbhdm8UJAb4ViCTsulYFL3lxMCd";
     final static String MOVIE_ID = "42";
 
-    static ContentValues createMovieRecord() {
+    static ContentValues createMovieRecord(Context mContext) {
 
         //Movie #1
         ContentValues movieValues = new ContentValues();
@@ -50,6 +46,25 @@ public class TestUtilities extends AndroidTestCase{
         movieValues.put(MoviesContract.MoviesEntry.COLUMN_BACKDROP,backdropID_1);
 
         return movieValues;
+    }
+
+    static ContentValues[] createTrailerRecord(Context mContext){
+
+        ContentValues[] trailerValues = new ContentValues[2];
+        ContentValues value1 = new ContentValues();
+        value1.put(MoviesContract.TrailerEntry.COLUMN_TRAILER_ID,"this_id");
+        value1.put(MoviesContract.TrailerEntry.COLUMN_TRAILER_TITLE,"this_title");
+        value1.put(MoviesContract.TrailerEntry.COLUMN_TRAILER_URI,"this_URI");
+        value1.put(MoviesContract.TrailerEntry.COLUMN_MOVIE_ID,MOVIE_ID);
+
+        ContentValues values2 = new ContentValues();
+        values2.put(MoviesContract.TrailerEntry.COLUMN_TRAILER_ID,"this_id_2");
+        values2.put(MoviesContract.TrailerEntry.COLUMN_TRAILER_TITLE,"this_title_2");
+        values2.put(MoviesContract.TrailerEntry.COLUMN_TRAILER_URI,"this_URI_2");
+        values2.put(MoviesContract.TrailerEntry.COLUMN_MOVIE_ID,MOVIE_ID);
+        trailerValues[0] = value1;
+        trailerValues[1] = values2;
+        return trailerValues;
     }
 
     static ContentValues createFavsRecord(){
@@ -76,7 +91,7 @@ public class TestUtilities extends AndroidTestCase{
     static ContentValues favoriteMovieValue(){
         ContentValues cv = new ContentValues();
         cv.put(MoviesContract.MoviesEntry.COLUMN_MOVIE_TITLE,titleTestString_1);
-        cv.put(MoviesContract.MoviesEntry.COLUMN_POSTER,posterID_1);
+        cv.put(MoviesContract.MoviesEntry.COLUMN_POSTER, posterID_1);
         return cv;
     }
 
@@ -119,13 +134,6 @@ public class TestUtilities extends AndroidTestCase{
             }.run();
             mHT.quit();
         }
-    }
-
-    static byte[] serialize(Context mContext,int res){
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        Bitmap bitmap = BitmapFactory.decodeResource(mContext.getResources(),res);
-        bitmap.compress(Bitmap.CompressFormat.PNG, 100, baos);
-        return baos.toByteArray();
     }
 
     static void validateCursor(String error, Cursor valueCursor, ContentValues expectedValues) {

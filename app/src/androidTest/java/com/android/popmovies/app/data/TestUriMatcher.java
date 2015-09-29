@@ -12,7 +12,7 @@ public class TestUriMatcher extends AndroidTestCase {
 
     // content://com.example.android.sunshine.app/weather"
     private static final Uri TEST_FAVORITE_URI = MoviesContract.FavoriteEntry.CONTENT_URI;
-    private static final Uri TEST_FAV_ID_URI = MoviesContract.FavoriteEntry.buildFavDetailWithID(MOVIE_ID);
+    private static final Uri TEST_TRAILER_URI = MoviesContract.TrailerEntry.buildTrailerswithID(MOVIE_ID);
     private static final Uri TEST_MOVIE_URI = MoviesContract.MoviesEntry.CONTENT_URI;
 
     /*
@@ -27,7 +27,7 @@ public class TestUriMatcher extends AndroidTestCase {
                 testMatcher.match(TEST_MOVIE_URI), MovieProvider.MOVIES);
         assertEquals("Error: The Favorites URI was matched incorrectly.",
                 testMatcher.match(TEST_FAVORITE_URI), MovieProvider.FAVORITES);
-        assertEquals("Error: The Favorites WITH MovieID URI was matched incorrectly.",
-                testMatcher.match(TEST_FAV_ID_URI), MovieProvider.FAVORITES_WITH_DETAILS);
+        assertEquals("Error: The Trailers URI was matched incorrectly.",
+                testMatcher.match(TEST_TRAILER_URI), MovieProvider.TRAILERS);
     }
 }

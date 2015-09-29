@@ -6,6 +6,5 @@
     <color name="movie_title_color">#03A9F4</color>
     <color name="review_title_color">#B2EBF2</color>
     <color name= "fab_normal">#FFF</color>
-    <color name="fab_ripple">#F06292</color>
-    <color name="fab_pressed">#F8BBD0</color>
+    <color name="fab_ripple">#FFC400</color>
 </resources>

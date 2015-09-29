@@ -59,8 +59,6 @@ public class GridViewAdapter extends ArrayAdapter<GridViewObject>{
                 .into(viewHolder.movieImage, new Callback() {
                     @Override
                     public void onSuccess() {
-                        viewHolder.movieImage.setVisibility(View.VISIBLE);
-                        viewHolder.movieTag.setVisibility(View.VISIBLE);
                         viewHolder.progressBar.setVisibility(View.GONE);
                     }
 

@@ -6,6 +6,17 @@ package app.sunshine.android.example.com.popmovies;
 public class Trailer {
     String trailerName;
     String trailerId;
+    String source;
+
+    public Trailer(){
+
+    }
+
+    public Trailer(String trailerName, String source, String trailerId) {
+        this.trailerName = trailerName;
+        this.source = source;
+        this.trailerId = trailerId;
+    }
 
     public String getTrailerId() {
         return trailerId;
@@ -17,12 +28,6 @@ public class Trailer {
 
     public String getTrailerName() {
         return trailerName;
-    }
-
-    public Trailer(String trailerName, String source, String trailerId) {
-        this.trailerName = trailerName;
-        this.source = source;
-        this.trailerId = trailerId;
     }
 
     public void setTrailerName(String trailerName) {
@@ -37,5 +42,5 @@ public class Trailer {
         this.source = source;
     }
 
-    String source;
+
 }

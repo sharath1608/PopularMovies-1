@@ -15,10 +15,19 @@ public class DetailMovieData {
     private String year;
     private String duration;
     private Trailer[] trailers;
+    private Review[] reviews;
     private ArrayList<CastViewObject> casts;
 
     public ArrayList<CastViewObject> getCasts() {
         return casts;
+    }
+
+    public Review[] getReviews() {
+        return reviews;
+    }
+
+    public void setReviews(Review[] reviews) {
+        this.reviews = reviews;
     }
 
     public void setCasts(ArrayList<CastViewObject> casts) {

@@ -26,12 +26,14 @@
         <item>Now Showing</item>
         <item>Most Popular First</item>
         <item>Highest Grossing First</item>
+        <item>Favorites</item>
     </string-array>
     <string name="connectionErrorString">Error receiving data from server! DO NOT PANIC!</string>
     <string name="synopsis">Overview</string>
     <string name="reviews">Reviews</string>
     <string name="dialog_close">Close</string>
     <string name="review">Review</string>
+    <string name="overview">Overview</string>
     <string name="no_review_text">No reviews available for this movie!</string>
     <string name="no_trailer_text">No trailers available for this movie!</string>
     <string name="appendAttr">trailers,credits</string>
@@ -47,4 +49,7 @@
     <string name="share_base_string3">#Flixology</string>
     <string name="no_share_text">No trailers available to share.</string>
     <string name="no_detals_text">No details available for this cast member.</string>
+    <string name="fav_add_success">Added to favorites</string>
+    <string name="fav_add_failure">Some weird error occurred.</string>
+    <string name="fav_remove_success">Removed from favorites</string>
 </resources>
