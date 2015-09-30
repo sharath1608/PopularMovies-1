@@ -3,8 +3,12 @@
     <color name="common_orange_deep">#FF5722</color>
     <color name="common_purple_deep">#9C27B0</color>
     <color name="common_green_deep">#43A047</color>
-    <color name="movie_title_color">#03A9F4</color>
-    <color name="review_title_color">#B2EBF2</color>
-    <color name= "fab_normal">#FFF</color>
-    <color name="fab_ripple">#FFC400</color>
+    <color name="light_blue_300">#4FC3F7</color>
+    <color name="blue_700">#1976D2</color>
+    <color name="cyan_100">#B2EBF2</color>
+    <color name= "white_common">#FFF</color>
+    <color name="yellow_A400">#FFC400</color>
+    <color name="indigo_500">#3F51B5</color>
+    <color name="indigo_700">#303F9F</color>
+    <color name="indigo_300">#7986CB</color>
 </resources>
