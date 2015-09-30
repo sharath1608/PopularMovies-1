@@ -13,8 +13,8 @@
 
     <TextView
         android:id="@+id/griditem_tag"
-        android:layout_alignEnd="@id/griditem_image"
         android:layout_width="match_parent"
+        android:layout_alignEnd="@id/griditem_image"
         android:layout_height="wrap_content"
         android:layout_alignParentBottom="true"
         android:background="@color/title_background_color"

@@ -48,11 +48,11 @@ public class GridViewAdapter extends ArrayAdapter<GridViewObject>{
             viewHolder =(ViewHolderItem) convertView.getTag();
         }
         viewHolder.movieTag.setText(gridViewObjects.get(position).getMovieTag());
-        viewHolder.movieTag.setVisibility(View.INVISIBLE);
-        viewHolder.movieImage.setVisibility(View.INVISIBLE);
+        //viewHolder.movieTag.setVisibility(View.INVISIBLE);
+        //viewHolder.movieImage.setVisibility(View.INVISIBLE);
 
-        Picasso
-                .with(mContext)
+        PicassoImageCache
+                .getPicassoInstance(mContext)
                 .load(gridViewObjects.get(position).getMovieUrl())
                 .resize(500, 750)
                 .error(R.drawable.user_placeholder_image)

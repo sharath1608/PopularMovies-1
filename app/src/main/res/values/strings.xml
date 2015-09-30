@@ -16,12 +16,12 @@
     <string name="now_showing_sort">now_playing</string>
     <string name="earnings_sort">revenue.desc</string>
     <string name="newest_sort">primary_release_date.desc</string>
-    <string name="hello_world">Hello world!</string>
     <string name="details_base_path">http://api.themoviedb.org/3/movie/</string>
     <string name="most_popular">Most Popular First</string>
     <string name="now_showing">Now Showing</string>
     <string name="highest_rated">Highest Rated First</string>
     <string name="highest_grossing">Highest Grossing First</string>
+    <string name="favorites">Favorites</string>
     <string-array name="sort_option">
         <item>Now Showing</item>
         <item>Most Popular First</item>

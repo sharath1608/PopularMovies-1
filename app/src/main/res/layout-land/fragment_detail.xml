@@ -32,7 +32,7 @@
             android:layout_width="fill_parent"
             android:layout_height="75dp"
             android:layout_below="@+id/movie_backdrop_layout"
-            android:background="@color/movie_title_color"
+            android:background="@color/indigo_300"
             android:elevation="5dp"
             android:outlineProvider="bounds"
             android:paddingBottom="20dp"
@@ -70,8 +70,8 @@
             android:layout_marginLeft="135dp"
             android:layout_marginBottom="35dp"
             android:src="@drawable/ic_favorite_small"
-            app:fab_colorNormal="@color/fab_normal"
-            app:fab_colorPressed="@color/fab_ripple"
+            app:fab_colorNormal="@color/white_common"
+            app:fab_colorPressed="@color/yellow_A400"
             app:fab_type="mini"/>
 
         <TextView
@@ -124,7 +124,8 @@
         <TextView
             android:id="@+id/synopis_text"
             style="@android:style/TextAppearance.Material.Medium"
-            android:textStyle="bold"
+            android:alpha="0.85"
+            android:textColor="@color/primary_dark_material_dark"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_alignStart="@+id/movie_description_detail"
@@ -166,14 +167,15 @@
         <TextView
             android:id="@+id/review_title_text"
             style="@android:style/TextAppearance.Material.Medium"
+            android:alpha="0.85"
+            android:textColor="@color/primary_dark_material_dark"
             android:layout_width="fill_parent"
             android:layout_height="wrap_content"
             android:layout_below="@id/review_divider"
             android:layout_marginBottom="5dp"
             android:layout_marginTop="2dp"
             android:gravity="center"
-            android:text="@string/reviews"
-            android:textStyle="bold" />
+            android:text="@string/reviews"/>
 
         <LinearLayout
             android:id="@+id/review_layout"
@@ -201,14 +203,15 @@
         <TextView
             android:id="@+id/cast_title_text"
             style="@android:style/TextAppearance.Material.Medium"
+            android:alpha="0.85"
+            android:textColor="@color/primary_dark_material_dark"
             android:layout_width="fill_parent"
             android:layout_height="wrap_content"
             android:layout_below="@id/cast_divider"
             android:layout_marginBottom="5dp"
             android:layout_marginTop="2dp"
             android:gravity="center"
-            android:text="@string/cast"
-            android:textStyle="bold" />
+            android:text="@string/cast"/>
 
 
         <android.support.v7.widget.RecyclerView
@@ -234,14 +237,15 @@
         <TextView
             android:id="@+id/trailer_title_text"
             style="@android:style/TextAppearance.Material.Medium"
+            android:alpha="0.85"
+            android:textColor="@color/primary_dark_material_dark"
             android:layout_width="fill_parent"
             android:layout_height="wrap_content"
             android:layout_below="@id/trailer_divider"
             android:layout_marginBottom="5dp"
             android:layout_marginTop="2dp"
             android:gravity="center"
-            android:text="@string/trailers"
-            android:textStyle="bold" />
+            android:text="@string/trailers"/>
 
         <LinearLayout
             android:id="@+id/trailer_layout"

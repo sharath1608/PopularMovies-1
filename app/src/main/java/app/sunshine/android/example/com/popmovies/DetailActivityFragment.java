@@ -32,6 +32,7 @@ import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.support.design.widget.Snackbar;
 import com.android.popmovies.app.data.MoviesContract.FavoriteEntry;
 import com.android.popmovies.app.data.MoviesContract.MoviesEntry;
 import com.android.popmovies.app.data.MoviesContract.ReviewsEntry;
@@ -87,7 +88,7 @@ public class DetailActivityFragment extends Fragment implements LoaderManager.Lo
     private boolean isMovieInDB;
     private boolean isCastInDB;
     private FloatingActionButton fab;
-    private Toast favToast;
+    private Snackbar favSnackBar;
     private int viewCount;
     private TextView movieRatingView;
     private TextView movieTitleView;
@@ -95,6 +96,7 @@ public class DetailActivityFragment extends Fragment implements LoaderManager.Lo
     private TextView movieDurationView;
     private TextView movieDescriptionView;
     private ImageView movieImageView;
+    private String favToggleString;
 
     public static DetailActivityFragment newInstance(String id) {
         DetailActivityFragment fragment = new DetailActivityFragment();
@@ -230,7 +232,7 @@ public class DetailActivityFragment extends Fragment implements LoaderManager.Lo
                 break;
             case FAV_LOADER:
                 if (data.moveToFirst()) {
-                    fab.setBackgroundColor(getResources().getColor(R.color.fab_ripple));
+                    fab.setBackgroundColor(getResources().getColor(R.color.yellow_A400));
                     isFavorite = true;
                 } else {
                     isFavorite = false;
@@ -396,7 +398,6 @@ public class DetailActivityFragment extends Fragment implements LoaderManager.Lo
 
     public void insertFavorite(DetailMovieData movieData) {
         LOG_TAG = getClass().getSimpleName();
-        String toastString = "";
 
         if (isMovieInDB) {
 
@@ -410,11 +411,11 @@ public class DetailActivityFragment extends Fragment implements LoaderManager.Lo
                 if (!(favRowID > 0)) {
                     Log.e(LOG_TAG, "Error inserting favorite to database");
                 } else {
-                    fab.setBackgroundColor(getResources().getColor(R.color.fab_ripple));
-                    if (favToast != null) {
-                        favToast.cancel();
+                    fab.setBackgroundColor(getResources().getColor(R.color.yellow_A400));
+                    if (favSnackBar != null) {
+                        favSnackBar.dismiss();
                     }
-                    toastString = getString(R.string.fav_add_success);
+                    favToggleString = getString(R.string.fav_add_success);
                     isFavorite = true;
                 }
 
@@ -424,19 +425,22 @@ public class DetailActivityFragment extends Fragment implements LoaderManager.Lo
                 getActivity().getContentResolver().delete(FavoriteEntry.CONTENT_URI,
                         FavoriteEntry.COLUMN_MOVIE_ID + "= ?",
                         new String[]{movieData.getMovieID()});
-                if (favToast != null) {
-                    favToast.cancel();
+                if (favSnackBar != null) {
+                    favSnackBar.dismiss();
                 }
-                toastString = getString(R.string.fav_remove_success);
-                fab.setBackgroundColor(getResources().getColor(R.color.fab_normal));
+                favToggleString= getString(R.string.fav_remove_success);
+                fab.setBackgroundColor(getResources().getColor(R.color.white_common));
                 isFavorite = false;
             }
         } else {
-            toastString = getString(R.string.fav_add_failure);
+            favToggleString = getString(R.string.fav_add_failure);
         }
-        favToast = Toast.makeText(getActivity(), toastString, Toast.LENGTH_SHORT);
-        favToast.setGravity(Gravity.BOTTOM, 0, -50);
-        favToast.show();
+        favSnackBar = Snackbar.make(getView(), favToggleString, Snackbar.LENGTH_SHORT);
+        View snackBarView = favSnackBar.getView();
+        TextView snackTextView = (TextView) snackBarView.findViewById(android.support.design.R.id.snackbar_text);
+        snackTextView.setTextColor(getResources().getColor(R.color.yellow_A400));
+        snackTextView.setGravity(Gravity.CENTER_HORIZONTAL);
+        favSnackBar.show();
     }
 
     @Override
@@ -832,7 +836,7 @@ public class DetailActivityFragment extends Fragment implements LoaderManager.Lo
         title.setText(popupTitle);
         title.setPadding(10, 25, 10, 20);
         title.setTextSize(21);
-        title.setBackgroundColor(getResources().getColor(R.color.movie_title_color));
+        title.setBackgroundColor(getResources().getColor(R.color.cyan_100));
         title.setGravity(Gravity.CENTER);
         builder.setCustomTitle(title);
         Button dismissButton = (Button) view.findViewById(R.id.dialog_dismiss_button);

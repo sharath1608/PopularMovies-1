@@ -1,7 +1,5 @@
 package app.sunshine.android.example.com.popmovies;
 
-import android.content.Context;
-import android.content.ContextWrapper;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.net.ConnectivityManager;
@@ -10,23 +8,22 @@ import android.os.AsyncTask;
 import android.preference.PreferenceManager;
 import android.support.v4.app.Fragment;
 import android.os.Bundle;
-import android.support.v7.widget.GridLayoutManager;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.ViewTreeObserver;
+import android.widget.AbsListView;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
+import android.widget.GridView;
 import android.widget.Spinner;
 import android.widget.SpinnerAdapter;
 import android.widget.Toast;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
-
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -36,29 +33,24 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
-import android.support.v7.widget.RecyclerView;
 
 /**
  * A placeholder fragment containing a simple view.
  */
 public class MainActivityFragment extends Fragment {
 
+    private ArrayAdapter<GridViewObject> movieGridAdapter;
     private static List<String> movieIds;
     private static List<GridViewObject> gridViewObjects;
     private String sortByValue;
     private String movieKey = "movieKey";
     private int position;
-    private RecyclerView movieListView;
+    private GridView gridView;
     private Toast noConnectToast;
     private static int pagenum;
     private boolean rogueFirstTime;
     private boolean justChangedToLand;
     private final String prefKey = "sortOption";
-    private MovieListAdapter movieListAdapter;
-    private GridLayoutManager gridLayoutManager;
-    private int firstVisibleCount;
-    private int totalCount;
-    private int visibleCount;
     private boolean nextPageCalling;
 
     public MainActivityFragment() {
@@ -78,8 +70,7 @@ public class MainActivityFragment extends Fragment {
                              Bundle savedInstanceState) {
 
         View view = inflater.inflate(R.layout.fragment_main, container, false);
-        movieListView = (RecyclerView) view.findViewById(R.id.movie_list_view);
-        nextPageCalling = true;
+        gridView = (GridView) view.findViewById(R.id.fragment_main_gridView);
         if (savedInstanceState != null) {
             gridViewObjects = (List<GridViewObject>) savedInstanceState.get(movieKey);
             position = savedInstanceState.getInt("position");
@@ -88,65 +79,39 @@ public class MainActivityFragment extends Fragment {
             gridViewObjects = new ArrayList<>();
         }
 
-        movieListAdapter = new MovieListAdapter(gridViewObjects);
-        gridLayoutManager = new GridLayoutManager(getActivity(),2);
-        movieListView.getViewTreeObserver().addOnGlobalLayoutListener(
-                new ViewTreeObserver.OnGlobalLayoutListener() {
-                    @Override
-                    public void onGlobalLayout() {
-                        movieListView.getViewTreeObserver().removeOnGlobalLayoutListener(this);
-                        float cardViewWidth;
-                        int viewWidth = movieListView.getMeasuredWidth();
-                        if(justChangedToLand){
-                            cardViewWidth = getResources().getDimension(R.dimen.land_card_width);
-                        }else {
-                            cardViewWidth = getResources().getDimension(R.dimen.port_card_width);
-                        }
-
-                        int newSpanCount = (int) Math.floor(viewWidth / cardViewWidth);
-                        gridLayoutManager.setSpanCount(newSpanCount);
-                        gridLayoutManager.requestLayout();
-                    }
-                });
-        movieListView.setLayoutManager(gridLayoutManager);
-        movieListAdapter.setOnItemClickListener(new MovieListAdapter.OnItemClickListener() {
+        movieGridAdapter = new GridViewAdapter(getActivity(), R.layout.grid_item_layout, gridViewObjects);
+        gridView.setAdapter(movieGridAdapter);
+        gridView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
 
             @Override
-            public void onItemClick(View v, int position) {
+            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
                 Intent detailIntent = new Intent(getActivity(), DetailActivity.class);
                 detailIntent.setType("text/plain");
                 String movieId = movieIds.get(position).toString();
                 detailIntent.putExtra(Intent.EXTRA_TEXT, movieId);
                 startActivity(detailIntent);
+
             }
         });
-        movieListView.setAdapter(movieListAdapter);
 
-
+        gridView.setSelection(position);
         // Read scroll position to set page number in the request.
-        movieListView.addOnScrollListener(new RecyclerView.OnScrollListener() {
-
+        gridView.setOnScrollListener(new AbsListView.OnScrollListener() {
             @Override
-            public void onScrollStateChanged(RecyclerView recyclerView, int newState) {
-                super.onScrollStateChanged(recyclerView, newState);
+            public void onScrollStateChanged(AbsListView view, int scrollState) {
+
             }
 
             @Override
-            public void onScrolled(RecyclerView recyclerView, int dx, int dy) {
-                super.onScrolled(recyclerView, dx, dy);
-                visibleCount = gridLayoutManager.getChildCount();
-                totalCount = gridLayoutManager.getItemCount();
-                firstVisibleCount = gridLayoutManager.findFirstVisibleItemPosition();
+            public void onScroll(AbsListView view, int firstVisibleItem, int visibleItemCount, int totalItemCount) {
 
-
-                if((firstVisibleCount + visibleCount >= totalCount) && nextPageCalling){
-                    pagenum++;
+                if ((firstVisibleItem + visibleItemCount >= totalItemCount) && nextPageCalling == true) {
                     nextPageCalling = false;
+                    pagenum++;
                     fetchMovies();
                 }
             }
         });
-
         setHasOptionsMenu(true);
         return view;
     }
@@ -162,7 +127,7 @@ public class MainActivityFragment extends Fragment {
     public void onSaveInstanceState(Bundle outState) {
         super.onSaveInstanceState(outState);
         outState.putParcelableArrayList(movieKey, (ArrayList) gridViewObjects);
-        //outState.putInt("position", gridView.getFirstVisiblePosition());
+        outState.putInt("position", gridView.getFirstVisiblePosition());
     }
 
     // Define the spinner to display the a drop-down menu to list the sort options.
@@ -286,8 +251,9 @@ public class MainActivityFragment extends Fragment {
                 }
 
                 pagenum = pagenum <= 1 ? 1 : pagenum;
-                builtUri = builtUri.buildUpon().appendQueryParameter(PAGE_NUM, String.valueOf(pagenum)).appendQueryParameter(API_REQ_STRING, apiKey).build();
                 nextPageCalling = true;
+                builtUri = builtUri.buildUpon().appendQueryParameter(PAGE_NUM, String.valueOf(pagenum)).appendQueryParameter(API_REQ_STRING, apiKey).build();
+
                 try {
                     URL url = new URL(builtUri.toString());
                     urlConnection = (HttpURLConnection) url.openConnection();
@@ -377,8 +343,9 @@ public class MainActivityFragment extends Fragment {
             if (res != null) {
                 List<GridViewObject> result = new ArrayList<>(res);
                 super.onPostExecute(res);
-                movieListAdapter.setMovieList(res);
-                movieListAdapter.notifyDataSetChanged();
+                movieGridAdapter.clear();
+                movieGridAdapter.addAll(result);
+                movieGridAdapter.notifyDataSetChanged();
             }
         }
     }
