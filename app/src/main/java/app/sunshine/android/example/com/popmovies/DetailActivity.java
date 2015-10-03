@@ -28,8 +28,11 @@ public class DetailActivity extends AppCompatActivity {
         }
 
         if(savedInstanceState == null){
-            DetailActivityFragment detailFrag = DetailActivityFragment.newInstance(movieId);
-            getSupportFragmentManager().beginTransaction().add(R.id.fragment_detail,detailFrag).commit();
+            DetailActivityFragment fragment = new DetailActivityFragment();
+            Bundle args = new Bundle();
+            args.putString(Intent.EXTRA_TEXT, movieId);
+            fragment.setArguments(args);
+            getSupportFragmentManager().beginTransaction().add(R.id.fragment_detail_container,fragment).commit();
         }
 
         setContentView(R.layout.activity_detail);

@@ -21,12 +21,4 @@
         android:gravity="center_horizontal|bottom"
         android:textColor="@color/title_text_color" />
 
-    <ProgressBar
-        android:layout_width="wrap_content"
-        android:id="@+id/prog_bar"
-        style="@android:style/Widget.Material.Light.ProgressBar.Small.Inverse"
-        android:layout_height="wrap_content"
-        android:layout_centerInParent="true"
-        android:indeterminate="true"/>
-
 </RelativeLayout>

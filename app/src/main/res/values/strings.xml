@@ -28,6 +28,7 @@
         <item>Highest Grossing First</item>
         <item>Favorites</item>
     </string-array>
+    <string name="no_connect_string">"No connectivity! Please check your internet connection.</string>
     <string name="connectionErrorString">Error receiving data from server! DO NOT PANIC!</string>
     <string name="synopsis">Overview</string>
     <string name="reviews">Reviews</string>
@@ -49,7 +50,10 @@
     <string name="share_base_string3">#Flixology</string>
     <string name="no_share_text">No trailers available to share.</string>
     <string name="no_detals_text">No details available for this cast member.</string>
+    <string name="no_fav_text">No favorites to display</string>
     <string name="fav_add_success">Added to favorites</string>
     <string name="fav_add_failure">Some weird error occurred.</string>
     <string name="fav_remove_success">Removed from favorites</string>
+    <string name="progress_text_main">"Loading images .."</string>
+    <string name="progress_text_detail">"Loading details .."</string>
 </resources>

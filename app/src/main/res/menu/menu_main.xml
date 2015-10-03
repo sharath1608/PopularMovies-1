@@ -3,7 +3,7 @@
 
     <item android:id="@+id/sort_spinner"
         app:showAsAction="always"
-        android:title="this"
+        android:title="dummy"
         android:orderInCategory="1"
         app:actionViewClass="android.widget.Spinner"/>
 </menu>

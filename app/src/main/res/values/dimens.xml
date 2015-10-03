@@ -4,4 +4,5 @@
     <dimen name="activity_vertical_margin">16dp</dimen>
     <dimen name="land_card_width">150dp</dimen>
     <dimen name="port_card_width">150dp</dimen>
+    <bool name="isTablet">false</bool>
 </resources>

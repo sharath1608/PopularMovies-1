@@ -1,14 +1,23 @@
 package app.sunshine.android.example.com.popmovies;
 
+
+import android.app.ProgressDialog;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.net.ConnectivityManager;
+import android.content.res.Configuration;
+import android.database.Cursor;
 import android.net.Uri;
 import android.os.AsyncTask;
+import android.os.Parcelable;
 import android.preference.PreferenceManager;
 import android.support.v4.app.Fragment;
 import android.os.Bundle;
+import android.support.v4.app.LoaderManager;
+import android.support.v4.content.CursorLoader;
+import android.support.v4.content.Loader;
+import android.support.v4.widget.CursorAdapter;
 import android.util.Log;
+import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuInflater;
@@ -21,6 +30,8 @@ import android.widget.GridView;
 import android.widget.Spinner;
 import android.widget.SpinnerAdapter;
 import android.widget.Toast;
+import com.android.popmovies.app.data.MoviesContract.MoviesEntry;
+import com.android.popmovies.app.data.MoviesContract.FavoriteEntry;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -37,21 +48,30 @@ import java.util.List;
 /**
  * A placeholder fragment containing a simple view.
  */
-public class MainActivityFragment extends Fragment {
+public class MainActivityFragment extends Fragment implements LoaderManager.LoaderCallbacks<Cursor> {
 
     private ArrayAdapter<GridViewObject> movieGridAdapter;
     private static List<String> movieIds;
+    private CursorAdapter favCursorAdapter;
     private static List<GridViewObject> gridViewObjects;
     private String sortByValue;
     private String movieKey = "movieKey";
     private int position;
     private GridView gridView;
-    private Toast noConnectToast;
+    private Toast commonToast;
     private static int pagenum;
     private boolean rogueFirstTime;
     private boolean justChangedToLand;
-    private final String prefKey = "sortOption";
+    private final String spinPosKey = "sortPos";
+    private final String spinStringKey = "sortString";
     private boolean nextPageCalling;
+    private String favSortString;
+    private String showSortString;
+    private String grossSortString;
+    private String popSortString;
+    private SharedPreferences prefs;
+    private ProgressDialog progDialog;
+    private String[] cursorSelection = {MoviesEntry.TABLE_NAME + "." + MoviesEntry._ID, MoviesEntry.COLUMN_MOVIE_ID, MoviesEntry.COLUMN_MOVIE_TITLE, MoviesEntry.COLUMN_POSTER};
 
     public MainActivityFragment() {
 
@@ -61,7 +81,7 @@ public class MainActivityFragment extends Fragment {
     public void onStart() {
         super.onStart();
 
-        if (gridViewObjects.size() == 0)
+        if (gridViewObjects.isEmpty())
             fetchMovies();
     }
 
@@ -71,6 +91,12 @@ public class MainActivityFragment extends Fragment {
 
         View view = inflater.inflate(R.layout.fragment_main, container, false);
         gridView = (GridView) view.findViewById(R.id.fragment_main_gridView);
+        favSortString = getString(R.string.favorites);
+        grossSortString = getString(R.string.highest_grossing);
+        popSortString = getString(R.string.most_popular);
+        showSortString = getString(R.string.now_showing);
+        prefs = PreferenceManager.getDefaultSharedPreferences(getActivity());
+
         if (savedInstanceState != null) {
             gridViewObjects = (List<GridViewObject>) savedInstanceState.get(movieKey);
             position = savedInstanceState.getInt("position");
@@ -79,23 +105,32 @@ public class MainActivityFragment extends Fragment {
             gridViewObjects = new ArrayList<>();
         }
 
+        favCursorAdapter = new CustomFavViewAdapter(getActivity(), null, 0);
         movieGridAdapter = new GridViewAdapter(getActivity(), R.layout.grid_item_layout, gridViewObjects);
-        gridView.setAdapter(movieGridAdapter);
+
+        // Set grid view columns here.
+        if(getResources().getBoolean(R.bool.isTablet)) {
+            Configuration config = getResources().getConfiguration();
+            if(config.orientation == config.ORIENTATION_LANDSCAPE) {
+                gridView.setNumColumns(2);
+            }else if(config.orientation == config.ORIENTATION_PORTRAIT){
+                gridView.setNumColumns(1);
+            }
+        }
         gridView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
 
             @Override
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-                Intent detailIntent = new Intent(getActivity(), DetailActivity.class);
-                detailIntent.setType("text/plain");
-                String movieId = movieIds.get(position).toString();
-                detailIntent.putExtra(Intent.EXTRA_TEXT, movieId);
-                startActivity(detailIntent);
-
+                String movieId = movieIds.get(position);
+                ((Callback) getActivity())
+                        .onItemSelected(movieId);
             }
         });
 
         gridView.setSelection(position);
         // Read scroll position to set page number in the request.
+
+
         gridView.setOnScrollListener(new AbsListView.OnScrollListener() {
             @Override
             public void onScrollStateChanged(AbsListView view, int scrollState) {
@@ -105,7 +140,8 @@ public class MainActivityFragment extends Fragment {
             @Override
             public void onScroll(AbsListView view, int firstVisibleItem, int visibleItemCount, int totalItemCount) {
 
-                if ((firstVisibleItem + visibleItemCount >= totalItemCount) && nextPageCalling == true) {
+                // If reached the end of page, fetch the next page from the request.
+                if ((firstVisibleItem + visibleItemCount >= totalItemCount) && nextPageCalling) {
                     nextPageCalling = false;
                     pagenum++;
                     fetchMovies();
@@ -119,32 +155,39 @@ public class MainActivityFragment extends Fragment {
     @Override
     public void onDestroy() {
         super.onDestroy();
-        if (noConnectToast != null)
-            noConnectToast.cancel();
+        if (commonToast != null)
+            commonToast.cancel();
+    }
+
+    public interface Callback {
+        /**
+         * DetailFragmentCallback for when an item has been selected.
+         */
+        void onItemSelected(String id);
     }
 
     @Override
     public void onSaveInstanceState(Bundle outState) {
-        super.onSaveInstanceState(outState);
         outState.putParcelableArrayList(movieKey, (ArrayList) gridViewObjects);
         outState.putInt("position", gridView.getFirstVisiblePosition());
+        super.onSaveInstanceState(outState);
     }
 
-    // Define the spinner to display the a drop-down menu to list the sort options.
-    @Override
+    // Define the spinner to display the a drop-down menu to list the sort options.    @Override
     public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
 
         String LOG_TAG = this.getClass().getSimpleName();
         super.onCreateOptionsMenu(menu, inflater);
+
         getActivity().getMenuInflater().inflate(R.menu.menu_main, menu);
 
         Log.v(LOG_TAG, "Entering onCreateOptionsMenu");
-        String savedSpinnerPos = PreferenceManager.getDefaultSharedPreferences(getActivity()).getString(prefKey, "");
+        String savedSpinnerPos = prefs.getString(spinPosKey, "");
         final Spinner sortingSpinner = (Spinner) menu.findItem(R.id.sort_spinner).getActionView();
         SpinnerAdapter spinnerAdapter = ArrayAdapter.createFromResource(getActivity().getApplication(), R.array.sort_option, android.R.layout.simple_spinner_dropdown_item);
         rogueFirstTime = true;
         sortingSpinner.setAdapter(spinnerAdapter);
-        if (savedSpinnerPos != "") {
+        if (savedSpinnerPos !=null && !savedSpinnerPos.isEmpty()) {
             sortingSpinner.setSelection(Integer.parseInt(savedSpinnerPos));
         }
         sortingSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
@@ -153,41 +196,65 @@ public class MainActivityFragment extends Fragment {
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
 
                 String itemSelected = parent.getItemAtPosition(position).toString();
-                SharedPreferences prefs;
+                SharedPreferences.Editor prefEditor = prefs.edit();
+                prefEditor.putString(spinPosKey, String.valueOf(position)).apply();
+                if (commonToast != null) {
+                    commonToast.cancel();
+                }
 
                 // Sorting criteria
-                if (itemSelected.equals(getString(R.string.most_popular))) {
+                // Sort by popularity
+                if (itemSelected.equals(popSortString)) {
                     sortByValue = getString(R.string.popularity_sort);
-                } else if (itemSelected.equals(getString(R.string.now_showing))) {
+                }
+                // Sort by "Now Showing"
+                else if (itemSelected.equals(showSortString)) {
                     sortByValue = getString(R.string.now_showing_sort);
-                } else if (itemSelected.equals(getString(R.string.highest_grossing))) {
+                }
+                // Sort by highest grossing
+                else if (itemSelected.equals(grossSortString)) {
                     sortByValue = getString(R.string.earnings_sort);
-                } else if (itemSelected.equals(getString(R.string.now_showing))) {
-                    sortByValue = getString(R.string.now_showing_sort);
+                }
+                // Sort by favorites
+                else if (itemSelected.equals(favSortString)) {
+                    sortByValue = getString(R.string.favorites);
+                }
+
+                // Depending on the sort criteria, set appropriate adapter for the view. If favorites, set favCursorAdapter, else set movieListAdapter
+                prefEditor.putString(spinStringKey, sortByValue).apply();
+                chooseAdapter();
+
+                // Initialize and display progress dialog.
+                if(NetworkUtils.isNetworkAvailable(getActivity())) {
+                    progDialog = new ProgressDialog(getActivity());
+                    progDialog.setMessage(getString(R.string.progress_text_main));
+                    progDialog.setIndeterminate(true);
+                    progDialog.show();
                 }
 
 
-                // Using sharedPreferences to store
-                prefs = PreferenceManager.getDefaultSharedPreferences(getActivity());
-                SharedPreferences.Editor prefEditor = prefs.edit();
-                prefEditor.putString(prefKey, String.valueOf(position)).commit();
+                if (sortByValue.equals(favSortString)) {
+                    viewFavorites();
+                }
 
                 // fetch the list of movies with the updated sort value
-                // Okay, firstly too many flags is not a thing. This *is* needed, that's what I think.
                 // onItemSelected is called when orientation is changed and when spinner is created.
                 if (!justChangedToLand) {
-
                     gridViewObjects = new ArrayList<>();
-                    if (!rogueFirstTime) {
+
+                    // If entering the first time (initialization of view), or if selected favorites as sort, then skip and do not fetch movies.
+                    if (!rogueFirstTime && !sortByValue.equals(favSortString)) {
                         pagenum = 1;
                         movieIds = new ArrayList<>();
                         fetchMovies();
                     } else {
+                        progDialog.dismiss();
                         rogueFirstTime = false;
                     }
                 } else {
                     justChangedToLand = false;
                     rogueFirstTime = false;
+                    progDialog.dismiss();
                 }
             }
 
@@ -198,23 +265,75 @@ public class MainActivityFragment extends Fragment {
         });
     }
 
-    public void fetchMovies() {
-        FetchMoviesTask fetchMoviesTask = new FetchMoviesTask();
-//        if(!NetworkUtils.isNetworkAvailable()) {
-//            noConnectToast = Toast.makeText(getActivity(), "No connectivity! Please check your internet connection.", Toast.LENGTH_SHORT);
-//            noConnectToast.show();
-//        }
-//        else
-        fetchMoviesTask.execute();
+
+    public void chooseAdapter() {
+
+        if (sortByValue.equals(getString(R.string.favorites))) {
+            gridView.setAdapter(favCursorAdapter);
+        } else {
+            gridView.setAdapter(movieGridAdapter);
+        }
     }
 
-//    public boolean isNetworkAvailable(){
-//        ConnectivityManager cm = (ConnectivityManager) getActivity().getSystemService(Context.CONNECTIVITY_SERVICE);
-//        NetworkUtils
-//
-//    }
+    public void viewFavorites() {
+        gridView.setAdapter(favCursorAdapter);
+        getLoaderManager().initLoader(0, null, this);
+    }
+
+    @Override
+    public CursorLoader onCreateLoader(int id, Bundle args) {
+        return new CursorLoader(getActivity(),
+                FavoriteEntry.CONTENT_URI,
+                cursorSelection,
+                null,
+                null,
+                null);
+    }
+
+    @Override
+    public void onLoadFinished(Loader loader, Cursor data) {
+        movieIds = new ArrayList<>();
+        if (data.moveToFirst()) {
+            do {
+                movieIds.add(data.getString(data.getColumnIndex(MoviesEntry.COLUMN_MOVIE_ID)));
+            } while (data.moveToNext());
+            favCursorAdapter.swapCursor(data);
+            progDialog.dismiss();
+        } else {
+            displayToastMessage(getString(R.string.no_fav_text));
+        }
+    }
+
+    // This method disables any progress dialogue and displays the toast.
+    public void displayToastMessage(String message){
+        if(progDialog!=null && progDialog.isShowing()){
+            progDialog.dismiss();
+        }
+        commonToast = Toast.makeText(getActivity(),
+                message,
+                Toast.LENGTH_SHORT);
+        commonToast.setGravity(Gravity.CENTER, 0, 0);
+        commonToast.show();
+    }
+
+    @Override
+    public void onLoaderReset(Loader loader) {
+
+    }
+
+    public void fetchMovies() {
+        FetchMoviesTask fetchMoviesTask = new FetchMoviesTask();
+        if (!NetworkUtils.isNetworkAvailable(getActivity())) {
+            displayToastMessage(getString(R.string.no_connect_string));
+        } else
+            fetchMoviesTask.execute();
+    }
 
     public class FetchMoviesTask extends AsyncTask<Void, Void, List<GridViewObject>> {
+        @Override
+        protected void onPreExecute() {
+            super.onPreExecute();
+        }
 
         @Override
         protected List<GridViewObject> doInBackground(Void... params) {
@@ -222,7 +341,7 @@ public class MainActivityFragment extends Fragment {
             BufferedReader reader = null;
             int connectionTimeout = 3000;
             String apiKey = getString(R.string.api_key);
-            String moviesJsonString = null;
+            String moviesJsonString;
             String LOG_TAG = FetchMoviesTask.class.getSimpleName();
             String MOVIES_BASE_URI = getString(R.string.tmdb_base_uri);
             String posterSize = getString(R.string.grid_poster_size);
@@ -232,8 +351,10 @@ public class MainActivityFragment extends Fragment {
 
 
             try {
-
-                sortByValue = sortByValue == null ? getString(R.string.now_showing_sort) : sortByValue;
+                sortByValue = prefs.getString(spinStringKey, "");
+                if (sortByValue == null || sortByValue.isEmpty()) {
+                    sortByValue = getString(R.string.now_showing_sort);
+                }
 
                 // URL example :  new URL("http://api.themoviedb.org/3/discover/movie?sort_by=popularity.desc&api_key=[YOUR API KEY]");
                 Uri builtUri = Uri.parse(MOVIES_BASE_URI).buildUpon().build();
@@ -243,6 +364,8 @@ public class MainActivityFragment extends Fragment {
                             .appendPath(getString(R.string.movie_tag))
                             .appendPath(getString(R.string.now_showing_sort))
                             .build();
+                } else if (sortByValue.equals(getString(R.string.favorites))) {
+                    return null;
                 } else {
                     builtUri = builtUri.buildUpon()
                             .appendPath(getString(R.string.discover_tag))
@@ -265,7 +388,7 @@ public class MainActivityFragment extends Fragment {
                 }
 
                 InputStream streamReader = urlConnection.getInputStream();
-                StringBuffer stringBuffer = new StringBuffer();
+                StringBuilder stringBuffer = new StringBuilder();
 
                 if (streamReader == null) {
                     return null;
@@ -317,7 +440,6 @@ public class MainActivityFragment extends Fragment {
             final String TITLE_TAG = "title";
             List<GridViewObject> movieGridObjects;
             JSONObject moviesJSON = new JSONObject(moviesJsonString);
-
             // This check is for scrolling multiple pages. The previous movies need to be retained when fetching the next page of movies.
             if (movieIds == null)
                 movieIds = new ArrayList<>();
@@ -332,7 +454,6 @@ public class MainActivityFragment extends Fragment {
                 movieGridObjects.add(gridViewObject);
                 movieIds.add(resultObject.getString(IDS_TAG));
             }
-
             return movieGridObjects;
         }
 
@@ -346,6 +467,7 @@ public class MainActivityFragment extends Fragment {
                 movieGridAdapter.clear();
                 movieGridAdapter.addAll(result);
                 movieGridAdapter.notifyDataSetChanged();
+                progDialog.dismiss();
             }
         }
     }

@@ -1,11 +1,14 @@
 package app.sunshine.android.example.com.popmovies;
 
+import android.os.Parcel;
+import android.os.Parcelable;
+
 import java.util.ArrayList;
 
 /**
  * Created by Asus1 on 8/13/2015.
  */
-public class DetailMovieData {
+public class DetailMovieData implements Parcelable{
 
     private String movieID;
     private String title;
@@ -14,9 +17,74 @@ public class DetailMovieData {
     private String rating;
     private String year;
     private String duration;
+    private String isFavorite;
+    private String isMovieInDB;
+    private String isReviewInDB;
+    private String isTrailerInDB;
+    private String isCastInDB;
     private Trailer[] trailers;
     private Review[] reviews;
     private ArrayList<CastViewObject> casts;
+
+    @Override
+    public int describeContents() {
+        return 0;
+    }
+
+    @Override
+    public void writeToParcel(Parcel dest, int flags) {
+        dest.writeStringArray(new String[]{
+                this.movieID,
+                this.title,
+                this.imageUrl,
+                this.description,
+                this.rating,
+                this.year,
+                this.duration,
+                this.isFavorite
+        });
+    }
+
+    public Boolean getFavorite() {
+        return Boolean.valueOf(isFavorite);
+    }
+
+    public void setFavorite(String isFavorite) {
+        this.isFavorite = isFavorite;
+    }
+
+    public Boolean getMovieInDB() {
+        return Boolean.valueOf(isMovieInDB);
+    }
+
+    public void setMovieInDB(String isMovieInDB) {
+        this.isMovieInDB = isMovieInDB;
+    }
+
+    public Boolean getTrailerInDB() {
+        return Boolean.valueOf(isTrailerInDB);
+    }
+
+    public void setTrailerInDB(String isTrailerInDB) {
+        this.isTrailerInDB = isTrailerInDB;
+    }
+
+    public Boolean getReviewInDB() {
+        return Boolean.valueOf(isReviewInDB);
+    }
+
+    public void setReviewInDB(String isReviewInDB) {
+        this.isReviewInDB = isReviewInDB;
+    }
+
+    public Boolean getCastInDB() {
+        return Boolean.valueOf(isCastInDB);
+    }
+
+    public void setCastInDB(String isCastInDB) {
+        this.isCastInDB = isCastInDB;
+    }
+
 
     public ArrayList<CastViewObject> getCasts() {
         return casts;

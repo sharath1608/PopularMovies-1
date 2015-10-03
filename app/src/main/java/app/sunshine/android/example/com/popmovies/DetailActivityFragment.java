@@ -1,6 +1,7 @@
 package app.sunshine.android.example.com.popmovies;
 
 
+import android.app.ProgressDialog;
 import android.content.ActivityNotFoundException;
 import android.content.ContentUris;
 import android.content.ContentValues;
@@ -27,9 +28,9 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
-import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.support.design.widget.Snackbar;
@@ -69,24 +70,21 @@ public class DetailActivityFragment extends Fragment implements LoaderManager.Lo
     private final int TRAILER_LOADER = 2;
     private final int REVIEW_LOADER = 3;
     private final int CAST_LOADER = 4;
-    private Toast noConnectToast;
+    private Toast commonToast;
     private Target loadTarget;
-    private ProgressBar progressBar;
     private final String API_REQ_STRING = "api_key";
-    private final String APPEND_TO_RESPONSE = "append_to_response";
-    private List<String> fullReviewList;
+    private final String detail_key = "detail_key";
     private boolean isReviewInDB;
     private boolean isTrailerInDB;
     private CastViewAdapter castAdapter;
-    private ArrayList<CastViewObject> castObjectArray;
     private RequestQueue mRequestQueue;
     private ShareActionProvider mShareActionProvider;
     private DetailMovieData thisMovieData;
-    private MenuItem shareMenuItem;
     private String LOG_TAG;
     private boolean isFavorite;
     private boolean isMovieInDB;
     private boolean isCastInDB;
+    private boolean isSavedState;
     private FloatingActionButton fab;
     private Snackbar favSnackBar;
     private int viewCount;
@@ -97,13 +95,12 @@ public class DetailActivityFragment extends Fragment implements LoaderManager.Lo
     private TextView movieDescriptionView;
     private ImageView movieImageView;
     private String favToggleString;
+    private TouchMask touchmask;
+    private ProgressDialog progDialog;
 
-    public static DetailActivityFragment newInstance(String id) {
-        DetailActivityFragment fragment = new DetailActivityFragment();
-        Bundle args = new Bundle();
-        args.putString(Intent.EXTRA_TEXT, id);
-        fragment.setArguments(args);
-        return fragment;
+
+    public DetailActivityFragment(){
+        setHasOptionsMenu(true);
     }
 
 
@@ -117,9 +114,21 @@ public class DetailActivityFragment extends Fragment implements LoaderManager.Lo
         isCastInDB = false;
         isReviewInDB = false;
         isMovieInDB = false;
+        isSavedState = false;
         mRequestQueue = Volley.newRequestQueue(getActivity());
         thisMovieData = new DetailMovieData();
         movieId = getArguments().getString(Intent.EXTRA_TEXT);
+
+        if (savedInstanceState != null) {
+            thisMovieData = (DetailMovieData) savedInstanceState.get(detail_key);
+            setFlags();
+            isSavedState = true;
+        }
+
+        progDialog = new ProgressDialog(getActivity());
+        progDialog.setMessage(getString(R.string.progress_text_detail));
+        progDialog.setIndeterminate(true);
+        progDialog.show();
 
         movieTitleView = (TextView) view.findViewById(R.id.movie_title_detail);
         movieRatingView = (TextView) view.findViewById(R.id.move_rating_detail);
@@ -127,10 +136,9 @@ public class DetailActivityFragment extends Fragment implements LoaderManager.Lo
         movieDurationView = (TextView) view.findViewById(R.id.movie_time_detail);
         movieDescriptionView = (TextView) view.findViewById(R.id.movie_description_detail);
         movieImageView = (ImageView) view.findViewById(R.id.movie_image_detail);
-
+       // touchmask = (TouchMask)view.findViewById(R.id.touch_mask);
         castAdapter = new CastViewAdapter(new ArrayList<CastViewObject>());
         fab = (FloatingActionButton) view.findViewById(R.id.movie_fav_fab);
-        progressBar = (ProgressBar) view.findViewById(R.id.progressBar_detail);
         RecyclerView recyclerView = (RecyclerView) view.findViewById(R.id.cast_list_view);
         LinearLayoutManager castLayoutManager = new LinearLayoutManager(getActivity());
         castLayoutManager.setOrientation(LinearLayoutManager.HORIZONTAL);
@@ -143,9 +151,6 @@ public class DetailActivityFragment extends Fragment implements LoaderManager.Lo
                 mRequestQueue.add(getPersonRequest(chosenCast.getCastId()));
             }
         });
-
-
-        setHasOptionsMenu(true);
         recyclerView.setAdapter(castAdapter);
         return view;
     }
@@ -153,11 +158,13 @@ public class DetailActivityFragment extends Fragment implements LoaderManager.Lo
     @Override
     public void onActivityCreated(Bundle savedInstanceState) {
         viewCount = 0;
-        getLoaderManager().initLoader(MOVIE_LOADER, null, this);
-        getLoaderManager().initLoader(FAV_LOADER, null, this);
-        getLoaderManager().initLoader(REVIEW_LOADER, null, this);
-        getLoaderManager().initLoader(TRAILER_LOADER, null, this);
-        getLoaderManager().initLoader(CAST_LOADER, null, this);
+        if(!isSavedState) {
+            getLoaderManager().initLoader(MOVIE_LOADER, null, this);
+            getLoaderManager().initLoader(FAV_LOADER, null, this);
+            getLoaderManager().initLoader(REVIEW_LOADER, null, this);
+            getLoaderManager().initLoader(TRAILER_LOADER, null, this);
+            getLoaderManager().initLoader(CAST_LOADER, null, this);
+        }
         super.onActivityCreated(savedInstanceState);
     }
 
@@ -176,7 +183,7 @@ public class DetailActivityFragment extends Fragment implements LoaderManager.Lo
             case FAV_LOADER:
                 detailLoader = new CursorLoader(getActivity(),
                         FavoriteEntry.buildFavDetailWithID(movieId),
-                        new String[]{FavoriteEntry._ID},
+                        new String[]{FavoriteEntry.TABLE_NAME+"."+FavoriteEntry._ID},
                         null,
                         null,
                         null);
@@ -229,14 +236,15 @@ public class DetailActivityFragment extends Fragment implements LoaderManager.Lo
                 } else {
                     isMovieInDB = false;
                 }
+
                 break;
             case FAV_LOADER:
                 if (data.moveToFirst()) {
-                    fab.setBackgroundColor(getResources().getColor(R.color.yellow_A400));
                     isFavorite = true;
                 } else {
                     isFavorite = false;
                 }
+                setFabColor();
                 break;
 
             case REVIEW_LOADER:
@@ -249,7 +257,6 @@ public class DetailActivityFragment extends Fragment implements LoaderManager.Lo
                     do {
                         String author = data.getString(data.getColumnIndex(ReviewsEntry.COLUMN_REVIEW_AUTHOR));
                         String reviewText = data.getString(data.getColumnIndex(ReviewsEntry.COLUMN_REVIEW_TEXT));
-                        reviewText = reviewText + " - " + author;
                         Review thisReview = new Review();
                         thisReview.setAuthor(author);
                         thisReview.setReviewText(reviewText);
@@ -299,12 +306,30 @@ public class DetailActivityFragment extends Fragment implements LoaderManager.Lo
                 throw new UnsupportedOperationException("loader could not be matched to pre-defined loaders");
         }
 
-        if (viewCount == 4) {
+        // If movie details are not present in DB, spawn volley requests to fetch from DB and insert it.
+        if (viewCount == 4 ) {
             if (isMovieInDB) {
                 setFragmentViews();
+            }else{
+                if (!NetworkUtils.isNetworkAvailable(getActivity())) {
+                    if(progDialog!=null && progDialog.isShowing())
+                        progDialog.dismiss();
+                    commonToast = Toast.makeText(getActivity(), getString(R.string.no_connect_string), Toast.LENGTH_SHORT);
+                    commonToast.show();
+                }
+                requestMovieDetails();
             }
             viewCount = 0;
         }
+    }
+
+    public void onMovieIDChanged(String id){
+        movieId = id;
+        getLoaderManager().restartLoader(MOVIE_LOADER,null,this);
+        getLoaderManager().restartLoader(FAV_LOADER,null,this);
+        getLoaderManager().restartLoader(REVIEW_LOADER,null,this);
+        getLoaderManager().restartLoader(TRAILER_LOADER,null,this);
+        getLoaderManager().restartLoader(FAV_LOADER,null,this);
     }
 
     @Override
@@ -319,6 +344,7 @@ public class DetailActivityFragment extends Fragment implements LoaderManager.Lo
         if (!isMovieInDB) {
             ContentValues movieValues = new ContentValues();
             ContentValues favValues = new ContentValues();
+            movieValues.put(MoviesEntry._ID,42);
             movieValues.put(MoviesEntry.COLUMN_MOVIE_ID, thisMovieData.getMovieID());
             movieValues.put(MoviesEntry.COLUMN_MOVIE_TITLE, thisMovieData.getTitle());
             movieValues.put(MoviesEntry.COLUMN_RUNTIME, thisMovieData.getDuration());
@@ -387,13 +413,29 @@ public class DetailActivityFragment extends Fragment implements LoaderManager.Lo
             Review[] movieReviews = thisMovieData.getReviews();
             for (Review review : movieReviews) {
                 ContentValues values = new ContentValues();
-                values.put(ReviewsEntry.COLUMN_REVIEW_AUTHOR, review.getAuthor());
+                values.put(ReviewsEntry.COLUMN_REVIEW_AUTHOR, "-"+review.getAuthor());
                 values.put(ReviewsEntry.COLUMN_MOVIE_ID, movieId);
                 values.put(ReviewsEntry.COLUMN_REVIEW_TEXT, review.getReviewText());
                 reviewValues[index++] = values;
             }
             getActivity().getContentResolver().bulkInsert(ReviewsEntry.buildReviewsWithID(movieId), reviewValues);
         }
+    }
+
+    public void saveFlags(){
+        thisMovieData.setMovieInDB(String.valueOf(isMovieInDB));
+        thisMovieData.setFavorite(String.valueOf(isFavorite));
+        thisMovieData.setCastInDB(String.valueOf(isCastInDB));
+        thisMovieData.setReviewInDB(String.valueOf(isReviewInDB));
+        thisMovieData.setTrailerInDB(String.valueOf(isTrailerInDB));
+    }
+
+    public void setFlags(){
+        isMovieInDB = thisMovieData.getMovieInDB();
+        isFavorite = thisMovieData.getFavorite();
+        isCastInDB = thisMovieData.getCastInDB();
+        isReviewInDB = thisMovieData.getReviewInDB();
+        isTrailerInDB = thisMovieData.getTrailerInDB();
     }
 
     public void insertFavorite(DetailMovieData movieData) {
@@ -411,12 +453,10 @@ public class DetailActivityFragment extends Fragment implements LoaderManager.Lo
                 if (!(favRowID > 0)) {
                     Log.e(LOG_TAG, "Error inserting favorite to database");
                 } else {
-                    fab.setBackgroundColor(getResources().getColor(R.color.yellow_A400));
                     if (favSnackBar != null) {
                         favSnackBar.dismiss();
                     }
                     favToggleString = getString(R.string.fav_add_success);
-                    isFavorite = true;
                 }
 
                 // If already marked as favorite, remove from DB.
@@ -428,39 +468,55 @@ public class DetailActivityFragment extends Fragment implements LoaderManager.Lo
                 if (favSnackBar != null) {
                     favSnackBar.dismiss();
                 }
-                favToggleString= getString(R.string.fav_remove_success);
-                fab.setBackgroundColor(getResources().getColor(R.color.white_common));
-                isFavorite = false;
+                favToggleString = getString(R.string.fav_remove_success);
             }
+            isFavorite = !isFavorite;
+            setFabColor();
         } else {
             favToggleString = getString(R.string.fav_add_failure);
         }
-        favSnackBar = Snackbar.make(getView(), favToggleString, Snackbar.LENGTH_SHORT);
-        View snackBarView = favSnackBar.getView();
-        TextView snackTextView = (TextView) snackBarView.findViewById(android.support.design.R.id.snackbar_text);
-        snackTextView.setTextColor(getResources().getColor(R.color.yellow_A400));
-        snackTextView.setGravity(Gravity.CENTER_HORIZONTAL);
-        favSnackBar.show();
+        commonToast = Toast.makeText(getActivity(), favToggleString, Toast.LENGTH_SHORT);
+        commonToast.show();
     }
 
     @Override
     public void onStart() {
         super.onStart();
-        requestMovieDetails();
 
+        if(isSavedState){
+            isSavedState = false;
+            setFragmentViews();
+        }
+    }
+
+    public void setFabColor(){
+        if(isFavorite){
+            fab.setBackgroundColor(getResources().getColor(R.color.yellow_A400));
+        }else{
+            fab.setBackgroundColor(getResources().getColor(R.color.white_common));
+        }
+    }
+
+    @Override
+    public void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+        saveFlags();
+        outState.putParcelable(detail_key, thisMovieData);
     }
 
     @Override
     public void onDestroy() {
         super.onDestroy();
-        if (noConnectToast != null)
-            noConnectToast.cancel();
+        if (commonToast != null)
+            commonToast.cancel();
     }
 
     public JsonObjectRequest getBasicInfoRequest() {
         final String apiKey = getString(R.string.api_key);
         final String DETAIL_BASE_URI = getString(R.string.details_base_path);
         String appendAttr = getString(R.string.appendAttr);
+        final String APPEND_TO_RESPONSE = "append_to_response";
+
         Uri baseRequestUri = Uri.parse(DETAIL_BASE_URI).buildUpon().appendPath(movieId)
                 .appendQueryParameter(API_REQ_STRING, apiKey).appendQueryParameter(APPEND_TO_RESPONSE, appendAttr).build();
 
@@ -476,7 +532,6 @@ public class DetailActivityFragment extends Fragment implements LoaderManager.Lo
                     if (!isMovieInDB) {
                         saveMovieDetails();
                     }
-                    progressBar.setVisibility(View.GONE);
                 } catch (JSONException e) {
                     Log.e(LOG_TAG, "Error reading the response");
                 }
@@ -528,9 +583,6 @@ public class DetailActivityFragment extends Fragment implements LoaderManager.Lo
         final String RESULT_TAG = "results";
         final String CONTENT_TAG = "content";
         final String AUTHOR_TAG = "author";
-        int reviewStart = 0;
-        int reviewEnd = 150;
-        fullReviewList = new ArrayList<>();
         JSONArray resultsArray = JsonResp.getJSONArray(RESULT_TAG);
         Review[] reviewArray = new Review[resultsArray.length()];
 
@@ -540,16 +592,15 @@ public class DetailActivityFragment extends Fragment implements LoaderManager.Lo
             JSONObject result = resultsArray.getJSONObject(i);
             String reviewString = result.getString(CONTENT_TAG);
             String author = result.getString(AUTHOR_TAG);
-            reviewEnd = reviewEnd > reviewString.length() ? reviewString.length() : reviewEnd;
-            fullReviewList.add("\"" + reviewString + "\"" + " -" + author);
-            reviewObject.setReviewText("\"" + reviewString.substring(reviewStart, reviewEnd) + "..." + "\"" + " -" + author);
             reviewObject.setAuthor(author);
+            reviewObject.setReviewText(reviewString);
             reviewArray[i] = reviewObject;
         }
 
         if (resultsArray.length() == 0) {
             Review reviewObject = new Review();
             reviewObject.setReviewText(getString(R.string.no_review_text));
+            reviewObject.setAuthor(" ");
             reviewArray = new Review[]{reviewObject};
         }
 
@@ -564,11 +615,13 @@ public class DetailActivityFragment extends Fragment implements LoaderManager.Lo
     }
 
     public void setReviewViews() {
-        Review[] reviewObjects = thisMovieData.getReviews();
+        final Review[] reviewObjects = thisMovieData.getReviews();
         LinearLayout layout = (LinearLayout) getActivity().findViewById(R.id.review_layout);
         for (int pos = 0; pos < reviewObjects.length; pos++) {
-            final int finalPos = pos;
+            final String thisReview = reviewObjects[pos].getReviewText();
+            final String thisAuthor = reviewObjects[pos].getAuthor();
             LayoutInflater inflater = (LayoutInflater) getActivity().getSystemService(Context.LAYOUT_INFLATER_SERVICE);
+            String shortenedView = Utilities.snipTextForView(thisReview) + thisAuthor;
             View v = inflater.inflate(R.layout.review_item_layout, null);
             TextView reviewText = (TextView) v.findViewById(R.id.movie_review_text);
 
@@ -576,13 +629,12 @@ public class DetailActivityFragment extends Fragment implements LoaderManager.Lo
                 reviewText.setOnClickListener(new View.OnClickListener() {
                     @Override
                     public void onClick(View v) {
-                        String reviewPos = fullReviewList.get(finalPos);
-                        extendedInfoPopUp(reviewPos, getString(R.string.review));
+                        extendedInfoPopUp(thisReview + thisAuthor, getString(R.string.review));
                     }
                 });
             }
 
-            reviewText.setText(reviewObjects[pos].getReviewText());
+            reviewText.setText(shortenedView);
             layout.addView(v);
         }
     }
@@ -637,9 +689,15 @@ public class DetailActivityFragment extends Fragment implements LoaderManager.Lo
 
     @Override
     public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
+        MenuItem shareMenuItem;
         super.onCreateOptionsMenu(menu, inflater);
+//        touchmask.enable_touchmask(true);
         shareMenuItem = menu.findItem(R.id.menu_movie_share);
         mShareActionProvider = (ShareActionProvider) MenuItemCompat.getActionProvider(shareMenuItem);
+        if(thisMovieData.getTrailers()!=null){
+            setShareProvider();
+        }
+
     }
 
     public void parseDetailsFromJson(String detailsJsonString, String posterSize) throws JSONException {
@@ -663,7 +721,7 @@ public class DetailActivityFragment extends Fragment implements LoaderManager.Lo
         final String CAST_NAME_TAG = "name";
         final String CAST_PROFILE_TAG = "profile_path";
         final String CAST_ID = "id";
-
+        ArrayList<CastViewObject> castObjectArray;
 
         JSONObject detailsJson = new JSONObject(detailsJsonString);
         String imageUrl = BASE_POSTER_PATH + posterSize + detailsJson.getString(POSTER_TAG);
@@ -713,7 +771,8 @@ public class DetailActivityFragment extends Fragment implements LoaderManager.Lo
     }
 
     public Intent createShareIntent() {
-        Intent shareIntent = new Intent(Intent.ACTION_SEND);
+        Intent shareIntent;
+        shareIntent = new Intent(Intent.ACTION_SEND);
         String shareString = getString(R.string.share_base_string_1)
                 + ": "
                 + thisMovieData.getTrailers()[0].getSource()
@@ -733,13 +792,16 @@ public class DetailActivityFragment extends Fragment implements LoaderManager.Lo
             loadTarget = new Target() {
                 @Override
                 public void onBitmapLoaded(Bitmap bitmap, Picasso.LoadedFrom from) {
-                    LinearLayout layout = (LinearLayout) getActivity().findViewById(R.id.movie_backdrop_layout);
-                    layout.setBackground(new BitmapDrawable(bitmap));
+
+                    // This is to fix crash that occurs rarely, when accessing details in very quick succession.
+                    if(getActivity()!=null) {
+                        LinearLayout layout = (LinearLayout) getActivity().findViewById(R.id.movie_backdrop_layout);
+                        layout.setBackground(new BitmapDrawable(bitmap));
+                    }
                 }
 
                 @Override
                 public void onBitmapFailed(Drawable errorDrawable) {
-
                 }
 
                 @Override
@@ -755,10 +817,10 @@ public class DetailActivityFragment extends Fragment implements LoaderManager.Lo
         }
     }
 
+
     public void setFragmentViews() {
         final int layoutWidth = 342;
         final int layoutHeight = 513;
-        final ProgressBar thisProgressBar = progressBar;
         String LOG_TAG = this.getClass().getSimpleName();
         try {
             android.view.ViewGroup.LayoutParams layoutParams = movieImageView.getLayoutParams();
@@ -767,6 +829,7 @@ public class DetailActivityFragment extends Fragment implements LoaderManager.Lo
             movieImageView.setLayoutParams(layoutParams);
             ImageView starImageView = (ImageView) getActivity().findViewById(R.id.starImage);
             starImageView.setImageResource(R.drawable.full_star);
+            setFabColor();
             fab.setOnClickListener(new View.OnClickListener() {
                 @Override
                 public void onClick(View v) {
@@ -782,7 +845,6 @@ public class DetailActivityFragment extends Fragment implements LoaderManager.Lo
                         @Override
                         public void onSuccess() {
                             loadBackgroundImage(thisMovieData.getBackdropUrl());
-                            thisProgressBar.setVisibility(View.GONE);
                         }
 
                         @Override
@@ -791,17 +853,21 @@ public class DetailActivityFragment extends Fragment implements LoaderManager.Lo
                         }
                     });
 
+            // Enable screen-wide touch and disable progress dialog.
+            //touchmask.enable_touchmask(false);
+            progDialog.dismiss();
+
             // Some foreign movies display duration = 0 and description as "null".
             movieRatingView.setText(thisMovieData.getRating());
             movieDateView.setText(thisMovieData.getYear());
 
-            if (thisMovieData.getDuration().equals("null") || Integer.parseInt(thisMovieData.getDuration()) == 0) {
+            if (thisMovieData.getDuration() == null || Integer.parseInt(thisMovieData.getDuration()) == 0) {
                 movieDurationView.setText("N/A");
             } else {
                 movieDurationView.setText(thisMovieData.getDuration() + getString(R.string.minutes));
             }
 
-            if (thisMovieData.getDescription().equals("null") || (thisMovieData.getDescription().length() == 0)) {
+            if (thisMovieData.getDescription() == null || (thisMovieData.getDescription().length() == 0)) {
                 movieDescriptionView.setText(getString(R.string.no_overview));
             } else {
                 final String description = thisMovieData.getDescription();

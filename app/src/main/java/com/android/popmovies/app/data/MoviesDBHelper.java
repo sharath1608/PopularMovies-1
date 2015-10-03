@@ -21,15 +21,17 @@ public class MoviesDBHelper extends SQLiteOpenHelper {
 
     @Override
     public void onCreate(SQLiteDatabase db) {
-        final String SQL_CREATE_MOVIE_TABLE = "CREATE TABLE "+MoviesContract.MoviesEntry.TABLE_NAME+" ( " +
-                MoviesContract.MoviesEntry.COLUMN_MOVIE_ID + " TEXT PRIMARY KEY NOT NULL, "+
+        final String SQL_CREATE_MOVIE_TABLE = "CREATE TABLE "+MoviesContract.MoviesEntry.TABLE_NAME+" (" +
+                MoviesContract.MoviesEntry._ID + " INTEGER , "+
+                MoviesContract.MoviesEntry.COLUMN_MOVIE_ID + " TEXT NOT NULL, "+
                 MoviesContract.MoviesEntry.COLUMN_MOVIE_TITLE + " TEXT NOT NULL, "+
                 MoviesContract.MoviesEntry.COLUMN_OVERVIEW + " TEXT NOT NULL, " +
                 MoviesContract.MoviesEntry.COLUMN_RATING + " TEXT NOT NULL, " +
                 MoviesContract.MoviesEntry.COLUMN_RELEASE_YEAR + " TEXT NOT NULL, " +
                 MoviesContract.MoviesEntry.COLUMN_RUNTIME + " TEXT NOT NULL, "+
                 MoviesContract.MoviesEntry.COLUMN_BACKDROP + " TEXT NOT NULL, " +
-                MoviesContract.MoviesEntry.COLUMN_POSTER + " TEXT NOT NULL);";
+                MoviesContract.MoviesEntry.COLUMN_POSTER + " TEXT NOT NULL,"+
+                " PRIMARY KEY("+ MoviesContract.MoviesEntry._ID+","+ MoviesContract.MoviesEntry.COLUMN_MOVIE_ID+"));";
 
         final String SQL_CREATE_FAV_TABLE = "CREATE TABLE " + MoviesContract.FavoriteEntry.TABLE_NAME+ " (" +
                 MoviesContract.FavoriteEntry._ID + " INTEGER PRIMARY KEY AUTOINCREMENT," +
